@@ -1,10 +1,9 @@
 #ifndef board_h
 #define board_h
-
-
-#include <cstdint>
 #include <defs.hpp>
 
+#include <cstdint>
+#include <string>
 typedef uint64_t u64;
 
 
@@ -16,11 +15,23 @@ class Board{
         //initialize board
         Board();
 
+        //initialize board with fen
+        Board(std::string fen);
+
         //return piece bitboards
-        u64 get_piece_bb(piece_color pc, piece_type pt);
+        u64 getPieceBB(piece_color pc, piece_type pt);
+
+        //clear all bitboards
+        void clearBitboards();
+
+        //set board to fen 
+        void setToFen(std::string fen);
 
     private:
-        u64 piece_bbs[2][6];    
+        // use 64 bit integers for board represetnation for each piece type
+        u64 piece_bbs[color_count][piece_count];   
+
+
 
 
 };
