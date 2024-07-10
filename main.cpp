@@ -8,17 +8,22 @@
 
 int loadPosition(const Board& board, std::vector<sf::Sprite> &sprite_pieces){
     int idx = 0;
-    std::vector<square_piece> sc_board = board.getSCBoard();
+    std::vector<std::pair<piece_color, piece_type>> sc_board = board.getSCBoard();
 
     for (int i = 0; i < 64; ++i){
-        if (sc_board[i] == EM){
+        if (sc_board[i].first == NONE){
             continue;
         }
         else{
-            int x = sc_board[i] % 6;
-            int y = sc_board[i] <= 5 ? 0 : 1;
+            int x = sc_board[i].second % 6;
+            int y = sc_board[i].first == WHITE ? 0 : 1;
 
             int rank = i >> 3, file = i % 8;
+
+            int map_to_png[6] = {5, 3, 2, 4, 1, 0};
+
+            x = map_to_png[x];
+            
 
             sprite_pieces[idx].setTextureRect(sf::IntRect(piece_size * x, piece_size * y, piece_size, piece_size));
             sprite_pieces[idx].setPosition(square_size * file, square_size * (7 - rank));
@@ -30,20 +35,22 @@ int loadPosition(const Board& board, std::vector<sf::Sprite> &sprite_pieces){
 
 
 int main(){
-    Board board = Board("r1bk3r/p2pBpNp/n4n2/1p1NP2P/6P1/3P4/P1P1K3/q5b1");
 
-    std::vector<std::string> piece_string = {"WK", "WQ", "WB", "WN", "WR", "WP", "BK", "BQ", "BB", "BN", "BR", "BP", "EM"};
-    std::vector<square_piece> sc_board = board.getSCBoard();
-    for (int i = 7; i >= 0; --i){
-        for (int j = 0; j < 8; ++j){
-            std::cout << piece_string[(int)(sc_board[8 * i + j])] << " ";
-        }
-        std::cout << std::endl;
-    }
+    std::string start_position = "r1bk3r/p2pBpNp/n4n2/1p1NP2P/6P1/3P4/P1P1K3/q5b1";
+    Board board = Board();
+
+    // std::vector<std::string> piece_string = {"WK", "WQ", "WB", "WN", "WR", "WP", "BK", "BQ", "BB", "BN", "BR", "BP", "EM"};
+    // std::vector<std::pair<piece_color, piece_type>> sc_board = board.getSCBoard();
+    // for (int i = 7; i >= 0; --i){
+    //     for (int j = 0; j < 8; ++j){
+    //         std::cout << piece_string[(int)(sc_board[8 * i + j])] << " ";
+    //     }
+    //     std::cout << std::endl;
+    // }
 
 
 
-    sf::RenderWindow window(sf::VideoMode(960, 960), "chess engine", sf::Style::Resize);
+    sf::RenderWindow window(sf::VideoMode(960, 960), "chess engine");
 
     sf::Texture piece_texture, board_texture;
     piece_texture.loadFromFile("images/pieces2.png");
@@ -62,14 +69,41 @@ int main(){
 
     int num_pieces_remaining = loadPosition(board, sprite_pieces);
 
+    std::string move = "";
+
     while (window.isOpen()){
         sf::Event event;
         if(window.pollEvent(event)){
-            if (event.type == sf::Event::Closed){
-                window.close();
+            switch (event.type){
+                case sf::Event::Closed:
+                    window.close();
+                    break;
+                case sf::Event::TextEntered:
+                    if (event.text.unicode != 8 && event.text.unicode < 128){
+                        char c = static_cast<char>(event.text.unicode);
+                        if (('1' <= c && c <= '8' && move.size() % 2 == 1) || ('a' <= c && c <= 'h' && move.size() % 2 == 0)){
+                            move += c;
+                            std::cout << move << std::endl;
+                        }
+                    }
+                    break;
+                case sf::Event::KeyPressed:
+                    if (event.key.code == sf::Keyboard::Backspace && !move.empty()){
+                        move.pop_back();
+                    }
+                    break;
+                default:
+                    break;
+            }
+            if (move.size() == 4){
+                board.update(move);
+                move = "";
             }
         }
 
+
+
+        loadPosition(board, sprite_pieces);
         window.clear();
         window.draw(sprite_board);
         for (int i = 0; i < num_pieces_remaining; ++i){
