@@ -53,8 +53,8 @@ int main(){
     sf::RenderWindow window(sf::VideoMode(960, 960), "chess engine");
 
     sf::Texture piece_texture, board_texture;
-    piece_texture.loadFromFile("images/pieces2.png");
-    board_texture.loadFromFile("images/board.png");
+    piece_texture.loadFromFile("../images/pieces2.png");
+    board_texture.loadFromFile("../images/board.png");
 
 
     sf::Sprite sprite_board(board_texture);
@@ -83,21 +83,8 @@ int main(){
                 case sf::Event::Closed:
                     window.close();
                     break;
-                case sf::Event::TextEntered:
-                    if (event.text.unicode != 8 && event.text.unicode < 128){
-                        char c = static_cast<char>(event.text.unicode);
-                        if (('1' <= c && c <= '8' && move.size() % 2 == 1) || ('a' <= c && c <= 'h' && move.size() % 2 == 0)){
-                            move += c;
-                            std::cout << move << std::endl;
-                        }
-                    }
-                    break;
                 case sf::Event::MouseButtonPressed:
-                    if (event.mouseButton.button == sf::Mouse::Left){
-                        move += (char)(localPosition.x/square_size + 'a');
-                        move += (char)((8 - localPosition.y/square_size) + '0');
-                        std::cout << move << std::endl;
-
+                    // if (event.mouseButton.button == sf::Mouse::Left){
                         for (int i = 0; i < num_pieces_remaining; ++i){
                             if (sprite_pieces[i].getGlobalBounds().contains(localPosition.x, localPosition.y)){
                                 isMove = true;
@@ -106,21 +93,18 @@ int main(){
                                 dy = localPosition.y - sprite_pieces[i].getPosition().y;
                             }
                         }
-
-                    }
+                        move += (char)(localPosition.x/square_size + 'a');
+                        move += (char)((8 - localPosition.y/square_size) + '0');
+                        // std::cout << move << std::endl;
+                    // }
                     break;
                 case sf::Event::MouseButtonReleased:
-                    if (event.mouseButton.button == sf::Mouse::Left){
+                    // if (event.mouseButton.button == sf::Mouse::Left){
                         isMove = false;
                         move += (char)(localPosition.x/square_size + 'a');
                         move += (char)((8 - localPosition.y/square_size) + '0');
-                        std::cout << move << std::endl;
-                    }
-                    break;
-                case sf::Event::KeyPressed:
-                    if (event.key.code == sf::Keyboard::Backspace && !move.empty()){
-                        move.pop_back();
-                    }
+                        // std::cout << move << std::endl;
+                    // }
                     break;
                 default:
                     break;

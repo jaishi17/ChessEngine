@@ -92,6 +92,8 @@ void Board::setToFen(std::string fen){
 
 }
 
+
+
 void Board::print_square(u64 n){
     for (int i = 7; i >= 0; i--){
         for (int j = 0; j < 8; ++j){
@@ -258,24 +260,24 @@ bool Board::check_king(piece_color pc, int pre_sq, int post_sq){
     bool can_castle = false;
 
     if (castling_rights[0] && pc == WHITE && pre_sq + 2 == post_sq){ //white kingside 
-        if (get_bit(piece_bbs[WHITE][ROOK], H1) && !get_bit(f_bb, F1) && !get_bit(f_bb, G1) && !is_square_attacked(BLACK, F1) && !is_square_attacked(BLACK, G1)){
+        if (get_bit(piece_bbs[WHITE][ROOK], H1) && !get_bit(f_bb, F1) && !inCheck(WHITE) && !get_bit(f_bb, G1) && !is_square_attacked(BLACK, F1) && !is_square_attacked(BLACK, G1)){
             can_castle = true;
         }
     }
     else if (castling_rights[1] && pc == WHITE && pre_sq - 2 == post_sq){ //white queenside
         if (get_bit(piece_bbs[WHITE][ROOK], A1) &&!get_bit(f_bb, B1) && !get_bit(f_bb, C1) && !get_bit(f_bb, D1) && 
-            !is_square_attacked(BLACK, C1) && !is_square_attacked(BLACK, D1)){
+            !inCheck(WHITE) && !is_square_attacked(BLACK, C1) && !is_square_attacked(BLACK, D1)){
             can_castle = true;
         }
     } 
     else if (castling_rights[2] && pc == BLACK && pre_sq + 2 == post_sq){ //black kingside
-        if (get_bit(piece_bbs[BLACK][ROOK], H8) &&!get_bit(f_bb, F8) && !get_bit(f_bb, G8) && !is_square_attacked(WHITE, F8) && !is_square_attacked(WHITE, G8)){
+        if (get_bit(piece_bbs[BLACK][ROOK], H8) &&!get_bit(f_bb, F8) && !inCheck(BLACK) && !get_bit(f_bb, G8) && !is_square_attacked(WHITE, F8) && !is_square_attacked(WHITE, G8)){
             can_castle = true;
         }
     }
     else if (castling_rights[3] && pc == BLACK && pre_sq - 2 == post_sq){ //black queenside 
         if (get_bit(piece_bbs[BLACK][ROOK], A8) &&!get_bit(f_bb, B8) && !get_bit(f_bb, C8) && !get_bit(f_bb, D8) && 
-            !is_square_attacked(WHITE, C8) && !is_square_attacked(WHITE, D8)){
+            !inCheck(BLACK) && !is_square_attacked(WHITE, C8) && !is_square_attacked(WHITE, D8)){
             can_castle = true;
         }
     }
@@ -291,6 +293,7 @@ bool Board::check_king(piece_color pc, int pre_sq, int post_sq){
     }
 }
 
+//pc is the attacking color
 bool Board::is_square_attacked(piece_color pc, int square){
     u64 pawns, knights, kings, bishops, rooks, queens;
     pawns = (pawn_attack[pc ^ 1][square] & piece_bbs[pc][PAWN]);
@@ -302,11 +305,15 @@ bool Board::is_square_attacked(piece_color pc, int square){
 
     u64 attacks = (pawns | knights | kings | rooks | bishops | queens);
 
-    std::cout << (squares_RF)(square) << std::endl;
-    print_square(attacks);
+    // std::cout << (squares_RF)(square) << std::endl;
+    // print_square(attacks);
 
     return attacks != (u64)0;
+}
 
+bool Board::inCheck(piece_color pc){
+    int king_loc = lsb(piece_bbs[pc][KING]);
+    return is_square_attacked((piece_color)(pc ^ 1), king_loc);
 }
 
 void Board::update_bitboard(piece_color pc, piece_type pt, int pre_sq, int post_sq){

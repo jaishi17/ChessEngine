@@ -70,24 +70,14 @@ class Board{
         Board(std::string fen);
         void init_Board();
         void setToFen(std::string fen);
-
-
-        //misc
-        inline u64 bit_set_to(u64 number, u64 n, bool x) {
-            return (number & ~((u64)1 << n)) | ((u64)x << n);
-        }
-
-        inline bool get_bit(u64 number, int pos){
-            return (number >> pos) & 1;
-        }
+        void clearBitboards();
+        void clearSCBoards();
 
         //debugging
         void print_square(u64 n);
         void print_square(u64 n, int square);
 
 
-        void clearBitboards();
-        void clearSCBoards();
         std::vector<std::pair<piece_color, piece_type>> const getSCBoard() const;
 
         //leaping pieces
@@ -124,7 +114,9 @@ class Board{
         bool check_queen(piece_color pc, int pre_sq, int post_sq);
         bool check_king(piece_color pc, int pre_sq, int post_sq);
 
-        bool is_square_attacked(piece_color pc, int square);
+        //useful stuff
+        bool is_square_attacked(piece_color pc, int square); //pc is attacking
+        bool inCheck(piece_color pc); //pc is defending
 
         //update board
         void update_bitboard(piece_color pc, piece_type pt, int pre_sq, int post_sq);

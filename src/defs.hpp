@@ -59,9 +59,6 @@ const int bishop_shift[64] = {
   57, 58, 58, 58, 58, 58, 58, 57
 };
 
-
-
-
 enum piece_color {WHITE, BLACK, NONE};
 enum piece_type {PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, ALL};
 // enum square_piece {WK, WQ, WB, WN, WR, WP, BK, BQ, BB, BN, BR, BP, EM};
@@ -77,6 +74,31 @@ enum squares_RF {
   A8, B8, C8, D8, E8, F8, G8, H8 
 
 };
+
+inline u64 bit_set_to(u64 number, u64 n, bool x) {
+	return (number & ~((u64)1 << n)) | ((u64)x << n);
+}
+
+inline bool get_bit(u64 number, int pos){
+    return (number >> pos) & 1;
+}
+
+const int lsb_index[64] = {
+    0, 47,  1, 56, 48, 27,  2, 60,
+   57, 49, 41, 37, 28, 16,  3, 61,
+   54, 58, 35, 52, 50, 42, 21, 44,
+   38, 32, 29, 23, 17, 11,  4, 62,
+   46, 55, 26, 59, 40, 36, 15, 53,
+   34, 51, 20, 43, 31, 22, 10, 45,
+   25, 39, 14, 33, 19, 30,  9, 24,
+   13, 18,  8, 12,  7,  6,  5, 63
+};
+
+const u64 debruijn64 = (u64)0x03f79d71b4cb0a89;
+
+inline int lsb(u64 n){
+   	return lsb_index[((n ^ (n-1)) * debruijn64) >> 58];
+}
 
 
 #endif
