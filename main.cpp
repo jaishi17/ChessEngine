@@ -36,7 +36,7 @@ int loadPosition(const Board& board, std::vector<sf::Sprite> &sprite_pieces){
 
 int main(){
 
-    std::string start_position = "r1bk3r/p2pBpNp/n4n2/1p1NP2P/6P1/3P4/P1P1K3/q5b1";
+    std::string start_position = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR";
     Board board = Board();
 
     // std::vector<std::string> piece_string = {"WK", "WQ", "WB", "WN", "WR", "WP", "BK", "BQ", "BB", "BN", "BR", "BP", "EM"};
@@ -70,8 +70,13 @@ int main(){
     int num_pieces_remaining = loadPosition(board, sprite_pieces);
 
     std::string move = "";
+    bool isMove = false;
+    int moving_piece = 0;
+    float dx = 0, dy = 0;
 
     while (window.isOpen()){
+        sf::Vector2i localPosition = sf::Mouse::getPosition(window);
+
         sf::Event event;
         if(window.pollEvent(event)){
             switch (event.type){
@@ -85,6 +90,31 @@ int main(){
                             move += c;
                             std::cout << move << std::endl;
                         }
+                    }
+                    break;
+                case sf::Event::MouseButtonPressed:
+                    if (event.mouseButton.button == sf::Mouse::Left){
+                        move += (char)(localPosition.x/square_size + 'a');
+                        move += (char)((8 - localPosition.y/square_size) + '0');
+                        std::cout << move << std::endl;
+
+                        for (int i = 0; i < num_pieces_remaining; ++i){
+                            if (sprite_pieces[i].getGlobalBounds().contains(localPosition.x, localPosition.y)){
+                                isMove = true;
+                                moving_piece = i;
+                                dx = localPosition.x - sprite_pieces[i].getPosition().x;
+                                dy = localPosition.y - sprite_pieces[i].getPosition().y;
+                            }
+                        }
+
+                    }
+                    break;
+                case sf::Event::MouseButtonReleased:
+                    if (event.mouseButton.button == sf::Mouse::Left){
+                        isMove = false;
+                        move += (char)(localPosition.x/square_size + 'a');
+                        move += (char)((8 - localPosition.y/square_size) + '0');
+                        std::cout << move << std::endl;
                     }
                     break;
                 case sf::Event::KeyPressed:
@@ -102,8 +132,12 @@ int main(){
         }
 
 
+        num_pieces_remaining = loadPosition(board, sprite_pieces);
 
-        loadPosition(board, sprite_pieces);
+        if (isMove){
+            sprite_pieces[moving_piece].setPosition(localPosition.x - dx, localPosition.y - dy);
+        }
+
         window.clear();
         window.draw(sprite_board);
         for (int i = 0; i < num_pieces_remaining; ++i){

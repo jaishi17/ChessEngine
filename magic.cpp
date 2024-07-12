@@ -4,6 +4,8 @@
 #include <iostream>
 #include <random>
 #include <bitset>
+#include <chrono>
+
 
 int Board::rook_hash(u64 blockers, int square){
     return (blockers * rook_magic[square]) >> (rook_shift[square]);
@@ -15,12 +17,7 @@ int Board::bishop_hash(u64 blockers, int square){
 
 u64 Board::rook_moves(u64 blockers, int square){
     blockers &= rook_mask[square];
-    print_square(blockers);
-
     int key = rook_hash(blockers, square);
-
-    std::cout << key << std::endl;
-
     return rook_table[square][key];
 }
 
@@ -29,6 +26,11 @@ u64 Board::bishop_moves(u64 blockers, int square){
     int key = bishop_hash(blockers, square);
     return bishop_table[square][key];
 }
+
+u64 Board::queen_moves(u64 blockers, int square){
+    return bishop_moves(blockers, square) | rook_moves(blockers, square);
+}
+
 
 void Board::generate_rook_mask(){
     //rook masks
@@ -46,12 +48,13 @@ void Board::generate_rook_mask(){
 }
 
 void Board::generate_bishop_mask(){
+
+    std::vector<std::pair<int, int>> dir = {{-1, -1}, {1, -1}, {-1, 1}, {1, 1}};
+
     //bishop masks
     for (int i = 0; i < 64; ++i){
         bishop_mask[i] = u64(0);
         int rank = i >> 3, file = i % 8;
-
-        std::vector<std::pair<int, int>> dir = {{-1, -1}, {1, -1}, {-1, 1}, {1, 1}};
         for (std::pair<int, int> k : dir){
             rank += k.first;
             file += k.second;
@@ -73,6 +76,8 @@ u64 Board::rook_attack(u64 blockers, int square){
     int rank = square >> 3, file = square % 8;
 
     for (std::pair<int, int> k : dir){
+        rank += k.first;
+        file += k.second;
         while (0 <= rank && rank <= 7 && 0 <= file && file <= 7){
             attacks = bit_set_to(attacks, 8 * rank + file, 1);
             if (blockers & ((u64)1 << (8 * rank + file))){
@@ -96,6 +101,8 @@ u64 Board::bishop_attack(u64 blockers, int square){
     int rank = square >> 3, file = square % 8;
 
     for (std::pair<int, int> k : dir){
+        rank += k.first;
+        file += k.second;
         while (0 <= rank && rank <= 7 && 0 <= file && file <= 7){
             attacks = bit_set_to(attacks, 8 * rank + file, 1);
             if (blockers & ((u64)1 << (8 * rank + file))){
@@ -117,14 +124,12 @@ void Board::generate_rook_magic(){
     std::default_random_engine generator(rd());
     std::uniform_int_distribution<u64> distribution(0,0xFFFFFFFFFFFFFFFF);
 
-    //rook magics
     for (int square = 0; square < 64; ++square){
         bool found_magic = false;
-        int trials = 100000;
         u64 blockers = rook_mask[square];
         int num_blockers = std::bitset<64>(blockers).count();
-        
         std::vector<u64> attacks(1 << num_blockers), idx (1 << num_blockers);
+
         u64 blocker_subset = 0;
         for (int i = 0; i < (1 << num_blockers); ++i){
             attacks[i] = rook_attack(blocker_subset, square);
@@ -132,21 +137,18 @@ void Board::generate_rook_magic(){
             blocker_subset = (blocker_subset - blockers) & blockers; //carry rippler trick
         }
 
-        for (int k = 0; k < trials && !found_magic; ++k){
+        while (!found_magic){
             std::vector<bool> visited(1 << rook_shift[square], false);
-            //want low bits
-            u64 possible_magic = distribution(generator) & distribution(generator) & distribution(generator);
-            // std::cout << "pop count is " << std::bitset<64>(possible_magic).count() << std::endl;
-            if(std::bitset<64>((blockers * possible_magic) & 0xFF00000000000000ULL).count() < 6) continue;
-
+            u64 possible_magic = distribution(generator) & distribution(generator) & distribution(generator); //want low bits
+            if(std::bitset<64>((blockers * possible_magic) & 0xFFF0000000000000ULL).count() < 6){
+                continue;
+            }
             rook_magic[square] = possible_magic;
-
             bool working_magic = true;
 
             //loop over configurations of blockers
             for (int i = 0; i < (1 << num_blockers); ++i){
-                u64 attack = attacks[i];
-                u64 subset = idx[i];
+                u64 attack = attacks[i], subset = idx[i];
                 int key = rook_hash(subset, square);
                 if (visited[key] && rook_table[square][key] != attack){
                     working_magic = false;
@@ -156,21 +158,59 @@ void Board::generate_rook_magic(){
                     visited[key] = true;
                     rook_table[square][key] = attack;
                 }
-                subset = (subset - blockers) & blockers; //carry rippler trick
             }
-            if (working_magic){
-                found_magic = true;
-            }            
-        }
-        if (!found_magic){
-            std::cout << "magic could not be found" << std::endl;
-        }
-        else{
-            std::cout << "magic found for square " << square << std::endl; 
+            found_magic = working_magic;   
         }
     }
-    
+
 }
+
+void Board::generate_bishop_magic(){
+    std::random_device rd;
+    std::default_random_engine generator(rd());
+    std::uniform_int_distribution<u64> distribution(0,0xFFFFFFFFFFFFFFFF);
+
+    for (int square = 0; square < 64; ++square){
+        bool found_magic = false;
+        u64 blockers = bishop_mask[square];
+        int num_blockers = std::bitset<64>(blockers).count();
+        std::vector<u64> attacks(1 << num_blockers), idx(1 << num_blockers);
+
+        u64 blocker_subset = 0;
+        for (int i = 0; i < (1 << num_blockers); ++i){
+            attacks[i] = bishop_attack(blocker_subset, square);
+            idx[i] = blocker_subset;
+            blocker_subset = (blocker_subset - blockers) & blockers;
+        }
+
+        while (!found_magic){
+            std::vector<bool> visited(1 << bishop_shift[square], false);
+            u64 possible_magic = distribution(generator) & distribution(generator) & distribution(generator);
+            if (std::bitset<64>((blockers * possible_magic) & 0xFFF0000000000000).count() < 6){
+                continue;
+            }
+            bishop_magic[square] = possible_magic;
+            bool working_magic = true;
+
+            for (int i = 0; i < (1 << num_blockers); ++i){
+                u64 attack = attacks[i], subset = idx[i];
+                int key = bishop_hash(subset, square);
+                if (visited[key] && bishop_table[square][key] != attack){
+                    working_magic = false;
+                    break;
+                }
+                else{
+                    visited[key] = true;
+                    bishop_table[square][key] = attack;
+                }
+
+            }
+            found_magic = working_magic;
+        }
+
+    }
+}
+
 
 void Board::init_magics(){
     for (int square = 0; square < 64; ++square){
@@ -178,11 +218,15 @@ void Board::init_magics(){
         bishop_table[square].resize(1 << (64 - bishop_shift[square]));
     }
 
-
+    // std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     generate_rook_mask();
     generate_rook_magic();
 
 
-    // generate_bishop_mask();
-    // generate_bishop_magic();
+    generate_bishop_mask();
+    generate_bishop_magic();
+
+    // std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+    // std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
+
 }
