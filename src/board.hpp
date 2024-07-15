@@ -12,53 +12,63 @@ typedef uint16_t u16;
 
 struct Move{
 
-    Move(int pre_sq, int post_sq, piece_type p_type, piece_type c_type, int castling_rights, bool castle, bool capture, bool promotion, bool color_turn);
+    Move(int pre_sq, int post_sq, piece_type p_type, piece_type c_type, int castling_rights, bool castle, bool capture, bool promotion, bool color_turn, bool en_passant, int prev_epsq);
 
-    inline int get_pre_sq(){
+    int get_pre_sq(){
         return move & 0x3f;
     }
-
-    inline int get_post_sq(){
+    int get_post_sq(){
         return (move >> 6) & 0x3f;
     }
 
     inline int get_promoted(){
-        return (move >> 12) & 0x3;
+        return (move >> 12) & 0x7;
     }
 
     inline int get_captured(){
-        return (move >> 14) & 0x7;
+        return (move >> 15) & 0x7;
     }
     inline int get_castling(){
-        return (move >> 17) & 0xF;
+        return (move >> 18) & 0xF;
     }
     
     inline bool check_castle(){
-        return (move >> 21) & 1;
-    }
-
-    inline bool check_capture(){
         return (move >> 22) & 1;
     }
 
-    inline bool check_promoted(){
+    inline bool check_capture(){
         return (move >> 23) & 1;
     }
-    
-    inline bool get_color_turn(){
+
+    inline bool check_promoted(){
         return (move >> 24) & 1;
     }
     
+    inline bool check_en_passant(){
+        return (move >> 25) & 1;
+    }
 
-    int move;
+    inline bool get_color_turn(){
+        return (move >> 26) & 1;
+    }
+
+    inline int get_epsq(){
+        return (move >> 27) & 0x3F;
+    }
+    
+
+    u64 move;
     // lsb to msb:
     // 6 bits from square
     // 6 bits to square  
-    // 2 bits for promotion type
+    // 3 bits for promotion type
     // 3 bits for capture type
     // 4 bits for a change in castlign rights 
-    // 3 bits for flags (castle, capture, promotion)
+    // 4 bits for flags (castle, capture, promotion, en_passant)
     // 1 bit for whose turn it is (0 for white)
+    // 6 bits for previous en passant square 
+
+    // total: 32
 };
 
 // use 64 bit integers for board represetnation for each piece type
@@ -79,6 +89,7 @@ class Board{
 
 
         std::vector<std::pair<piece_color, piece_type>> const getSCBoard() const;
+        piece_color get_color();
 
         //leaping pieces
         void generate_pawn_table();
@@ -120,22 +131,35 @@ class Board{
 
         //update board
         void update_bitboard(piece_color pc, piece_type pt, int pre_sq, int post_sq);
-        void move_piece(piece_color pc, piece_type pt, int pre_sq, int post_sq);
+        void move_piece(Move move);
         void update(std::string move);
         void make_move(Move move); 
         void unmake_move(Move move); 
 
-        //move generation
+        //move generation - movegen.cpp
         // std::vector<Move> generate_legal_moves(std::vector<Move> &moves);
-        // std::vector<Move> generate_pseudolegal_moves(std::vector<Move> &moves);
+        void generate_pawn_moves(std::vector<Move> &moves);
+        void generate_knight_moves(std::vector<Move> &moves);
+        void generate_bishop_moves(std::vector<Move> &moves);
+        void generate_rook_moves(std::vector<Move> &moves);
+        void generate_queen_moves(std::vector<Move> &moves);
+        void generate_king_moves(std::vector<Move> &moves);
+        Move add_move(int pre_sq, int post_sq, int castling_rights, bool castling, bool promotion, bool en_passant, piece_type p_type);
+        std::vector<Move> generate_pseudolegal_moves();
 
+        void show_state();
+        u64 perft(int depth, bool divide = false);
+
+        bool debug = false;
 
     private:
 
-        //TODO fifty move rule, three fold, time, insufficient, promotion
+
         bool castling_rights[4] = {true, true, true, true}; //WK, WQ, BK, bQ
-        bool white_turn = true;
-        int move_num = 0;
+        bool color_turn = false; //white = 0, black = 1
+        int move_num = 0; 
+        
+        int en_passant_sq = 0; //square that the attacking pawn would capture in 
 
         std::vector<Move> move_list;
 

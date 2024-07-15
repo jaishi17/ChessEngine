@@ -6,28 +6,35 @@
 #include <fstream>
 #include <bitset>
 #include <map>
+#include <chrono>
 
 
-Move::Move(int pre_sq, int post_sq, piece_type p_type, piece_type c_type, int castling_rights, bool castle, bool capture, bool promotion, bool color_turn){
+
+Move::Move(int pre_sq, int post_sq, piece_type p_type, piece_type c_type, int castling_rights, bool castle, bool capture, bool promotion, bool en_passant, bool color_turn, int prev_epsq){
     move = 0;
-    move = pre_sq & (post_sq << 6) & ((int)p_type << 12) & ((int)c_type << 14) & (castling_rights << 17) & ((int)castle << 21) & ((int)capture << 22) & ((int)promotion << 23) & ((int)color_turn << 24);
+    move = pre_sq | (post_sq << 6) | ((int)p_type << 12) | ((int)c_type << 15) | (castling_rights << 18) | ((int)castle << 22) | ((int)capture << 23) | ((int)promotion << 24) | ((int)en_passant << 25) | ((int)color_turn << 26) | (((u64)prev_epsq) << 27);
+
 }
 
 Board::Board(){
     init_Board();
-    setToFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR");
+    setToFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 ");
 }
 
 Board::Board(std::string fen){
     init_Board();
     setToFen(fen);
+
+    
 }
 
 void Board::init_Board(){
+
     generate_pawn_table();
     generate_knight_table();
     generate_king_table();
     init_magics();
+    
 }
 
 
@@ -36,6 +43,9 @@ std::vector<std::pair<piece_color, piece_type>> const Board::getSCBoard() const 
     return sc_board;
 }
 
+piece_color Board::get_color(){
+    return color_turn ? BLACK : WHITE;
+}
 
 void Board::clearBitboards(){
     for (int i = 0; i < color_count; ++i){
@@ -43,6 +53,7 @@ void Board::clearBitboards(){
             piece_bbs[i][j] = 0;
         }
     }
+    f_bb = 0;
 }
 
 void Board::clearSCBoards(){
@@ -57,6 +68,7 @@ void Board::setToFen(std::string fen){
 
     clearBitboards();
     clearSCBoards();
+    
 
     int rank = 8, fen_idx = 0;
     char file = 'a';
@@ -66,7 +78,7 @@ void Board::setToFen(std::string fen){
                                                               {'r', {BLACK, ROOK}}, {'q', {BLACK, QUEEN}},{'k', {BLACK, KING}}, 
                                                               {'P', {WHITE, PAWN}}, {'N', {WHITE, KNIGHT}}, {'B', {WHITE, BISHOP}}, 
                                                               {'R', {WHITE, ROOK}}, {'Q', {WHITE, QUEEN}}, {'K', {WHITE, KING}}};
-    while (fen_idx < len){
+    while (fen[fen_idx] != ' '){
         if (fen[fen_idx] == '/'){
             rank--;
             file = 'a';
@@ -85,11 +97,41 @@ void Board::setToFen(std::string fen){
             piece_bbs[pc][ALL] = bit_set_to(piece_bbs[pc][ALL], pos, 1);
             f_bb = bit_set_to(f_bb, pos, 1);
             sc_board[pos] = {pc, pt};
+        }
+        fen_idx++;
+    }
+    fen_idx++;
+    color_turn = (fen[fen_idx] == 'w' ? 0 : 1); 
+    castling_rights[0] = false;
+    castling_rights[1] = false;
+    castling_rights[2] = false;
+    castling_rights[3] = false;
+    en_passant_sq = 0;
 
+    fen_idx += 2;
+    while(fen[fen_idx] != ' '){
+
+        switch (fen[fen_idx]){
+            case 'K':
+                castling_rights[0] = true;
+                break;
+            case 'Q':
+                castling_rights[1] = true;
+                break;
+            case 'k':
+                castling_rights[2] = true;
+                break;
+            case 'q':
+                castling_rights[3] = true;
+                break;
         }
         fen_idx++;
     }
 
+    fen_idx++;
+    if ('a' <= fen[fen_idx] && fen[fen_idx] <= 'h'){
+        en_passant_sq = (int)(fen[fen_idx] - 'a') + 8 * ((int)(fen[fen_idx + 1] - '1'));
+    }
 }
 
 
@@ -187,10 +229,10 @@ bool Board::check_pawn(piece_color pc, int pre_sq, int post_sq){
     u64 push = pawn_push[pc][pre_sq] & ~(f_bb);
     
     //make sure double push doesn't jump over smth
-    if (pre_sq >> 3 == 2 && pc == WHITE && !(push & ((u64)1 << (pre_sq + 8)))){
+    if (pre_sq >> 3 == 1 && pc == WHITE && !(~f_bb & ((u64)1 << (pre_sq + 8)))){
         push = 0;
     }
-    else if (pre_sq >> 3 == 6 && pc == BLACK && !(push & ((u64)1 << (pre_sq - 8)))){
+    else if (pre_sq >> 3 == 6 && pc == BLACK && !(~f_bb & ((u64)1 << (pre_sq - 8)))){
         push = 0;
     }
     u64 attack = pawn_attack[pc][pre_sq] & piece_bbs[pc ^ 1][ALL];
@@ -317,6 +359,7 @@ bool Board::inCheck(piece_color pc){
 }
 
 void Board::update_bitboard(piece_color pc, piece_type pt, int pre_sq, int post_sq){
+
     piece_bbs[pc][pt] = bit_set_to(piece_bbs[pc][pt], pre_sq, 0);
     piece_bbs[pc][pt] = bit_set_to(piece_bbs[pc][pt], post_sq, 1);
     piece_bbs[pc][ALL] = bit_set_to(piece_bbs[pc][ALL], pre_sq, 0);
@@ -325,14 +368,94 @@ void Board::update_bitboard(piece_color pc, piece_type pt, int pre_sq, int post_
     f_bb = bit_set_to(f_bb, post_sq, 1);
 }
 
-void Board::move_piece(piece_color pc, piece_type pt, int pre_sq, int post_sq){
+void Board::move_piece(Move move){   
+    int pre_sq = move.get_pre_sq(), post_sq = move.get_post_sq();
+    piece_color pc = sc_board[pre_sq].first;
+    piece_type pt = sc_board[pre_sq].second; 
+
+    bool castle = move.check_castle(), capture = move.check_capture(), promotion = move.check_promoted(), en_passant = move.check_en_passant();
+    piece_type p_type = (piece_type)move.get_promoted(), c_type = (piece_type)move.get_captured();
+    int new_castling_rights = move.get_castling();
 
     update_bitboard(pc, pt, pre_sq, post_sq);
 
+
+    //capturing a piece
+    if (capture){
+
+        u64 cap_sq = post_sq;
+        if (en_passant){
+            if (pc == WHITE){
+                cap_sq = post_sq - 8;
+            }
+            else { 
+                cap_sq = post_sq + 8;
+            }
+            f_bb = bit_set_to(f_bb, cap_sq, 0);
+            sc_board[cap_sq].first = NONE;
+        }        
+
+        piece_bbs[pc ^ 1][ALL] = bit_set_to(piece_bbs[pc ^ 1][ALL], cap_sq, 0);
+        piece_bbs[pc ^ 1][c_type] = bit_set_to(piece_bbs[pc ^ 1][c_type], cap_sq, 0);
+    }
+    //castle
+    if (castle){
+        int rook_prev = 0, rook_post = 0;
+        if (pc == WHITE && pre_sq + 2 == post_sq){
+            rook_prev = 7, rook_post = 5;
+        }
+        else if (pc == WHITE && pre_sq - 2 == post_sq){
+            rook_prev = 0, rook_post = 3;
+        } 
+        else if (pc == BLACK && pre_sq + 2 == post_sq){
+            rook_prev = 63, rook_post = 61;
+        } 
+        else if (pc == BLACK && pre_sq - 2 == post_sq){
+            rook_prev = 56, rook_post = 59;
+        }
+        update_bitboard(pc, ROOK, rook_prev, rook_post);
+        sc_board[rook_prev].first = NONE;
+        sc_board[rook_post] = {pc, ROOK};
+    }
+    if (promotion){
+        piece_bbs[pc][PAWN] = bit_set_to(piece_bbs[pc][PAWN], post_sq, 0);
+        piece_bbs[pc][p_type] = bit_set_to(piece_bbs[pc][p_type], post_sq, 1);
+        pt = p_type;
+    }
+
+    //castling rights
+    for (int i = 0; i < 4; ++i){
+        if (new_castling_rights & (1 << i)){
+            castling_rights[i] = false;
+        }
+    }
+    en_passant_sq = 0;
+    // en_passant 
+    if (pc == WHITE && post_sq == pre_sq + 16 && pt == PAWN){
+        en_passant_sq = pre_sq + 8;
+    } 
+    else if (pc == BLACK && post_sq == pre_sq - 16 && pt == PAWN){
+        en_passant_sq = pre_sq - 8;
+    }
+
+    sc_board[pre_sq].first = NONE;
+    sc_board[post_sq] = {pc, pt};
+    color_turn = !color_turn;
+    move_list.push_back(move);   
+}
+
+void Board::update(std::string move){
+    int pre_sq = 8 * ((int)(move[1] - '1')) + (move[0] - 'a'), post_sq = 8 * ((int)(move[3] - '1')) + (move[2] - 'a');
+    piece_color pc = sc_board[post_sq].first;
+    piece_type pt = sc_board[post_sq].second; 
+
+    update_bitboard(pc, pt, pre_sq, post_sq);
+
+   
     // to create the move thing 
-    piece_type capture_type, promoted_type = ALL;
-    bool castle, captured, promoted;
-    int change_castling_rights;
+    piece_type capture_type = ALL;
+    bool castle, captured, promoted, en_passant = false;
+    int change_castling_rights = 0;
 
     //capturing a piece
     if (piece_bbs[pc ^ 1][ALL] & ((u64)1 << post_sq)){
@@ -362,6 +485,7 @@ void Board::move_piece(piece_color pc, piece_type pt, int pre_sq, int post_sq){
         sc_board[rook_post] = {pc, ROOK};
         castle = true;
     }
+
     //castling rights
     if (pt == KING){
         castling_rights[pc * 2] = false;
@@ -375,171 +499,122 @@ void Board::move_piece(piece_color pc, piece_type pt, int pre_sq, int post_sq){
             change_castling_rights = 2 << (pc * 2); 
         }
         else if (file == 7){
+            
             castling_rights[pc * 2] = false;
+
             change_castling_rights = 1 << (pc * 2);
+
         }
     }
-    //promotion - auto promote to queen for now
+    //promotion
+    piece_type p_type = QUEEN;
     if (pt == PAWN && pc == WHITE && (pre_sq >> 3) == 6){
         piece_bbs[WHITE][PAWN] = bit_set_to(piece_bbs[WHITE][PAWN], post_sq, 0);
-        piece_bbs[WHITE][QUEEN] = bit_set_to(piece_bbs[WHITE][QUEEN], post_sq, 1);
-        pt = QUEEN;
-        promoted_type = QUEEN;
+        piece_bbs[WHITE][p_type] = bit_set_to(piece_bbs[WHITE][p_type], post_sq, 1);
+        pt = p_type;
         promoted = true;
     }
     else if (pt == PAWN && pc == BLACK && (pre_sq >> 3) == 1){
         piece_bbs[BLACK][PAWN] = bit_set_to(piece_bbs[BLACK][PAWN], post_sq, 0);
-        piece_bbs[BLACK][QUEEN] = bit_set_to(piece_bbs[BLACK][QUEEN], post_sq, 1);
-        pt = QUEEN;
-        promoted_type = QUEEN;
+        piece_bbs[BLACK][p_type] = bit_set_to(piece_bbs[BLACK][p_type], post_sq, 1);
+        pt = p_type;
         promoted = true;
     }
 
     sc_board[pre_sq].first = NONE;
     sc_board[post_sq] = {pc, pt};
-    white_turn = !white_turn;
-    move_list.push_back(Move(pre_sq, post_sq, promoted_type, capture_type, change_castling_rights, castle, captured, promoted, pc));
-    
-}
-
-void Board::update(std::string move){
-    int pre_sq = 8 * ((int)(move[1] - '1')) + (move[0] - 'a'), post_sq = 8 * ((int)(move[3] - '1')) + (move[2] - 'a');
-    std::pair<piece_color, piece_type> piece = sc_board[pre_sq];
-
-    if (piece.first == NONE){
-        std::cout << "no piece selected" << std::endl;
-        return;
-    }
-    else if ((piece.first == WHITE) == !white_turn){
-        std::cout << "it is " << ( white_turn ? "white" : "black" ) << "'s move" << std::endl;
-        return;
-    }
-
-    std::vector<std::string> map_color = {"WHITE", "BLACK"};
-    std::vector<std::string> map_pieces = {"PAWN", "KNIGHT", "BISHOP", "ROOK", "QUEEN", "KING"};
-    std::cout << map_color[piece.first] << " " << map_pieces[piece.second] << " " << move << " " << pre_sq << " " << post_sq << std::endl;
-
-
-    switch (piece.second){
-        case PAWN:
-            if (!check_pawn(piece.first, pre_sq, post_sq)){
-                break;
-            }
-            move_piece(piece.first, piece.second, pre_sq, post_sq);
-            break;
-        case KNIGHT:
-            if (!check_knight(piece.first, pre_sq, post_sq)){
-                break;
-            }
-            move_piece(piece.first, piece.second, pre_sq, post_sq);
-            break;
-        case BISHOP:
-            if (!check_bishop(piece.first, pre_sq, post_sq)){
-                break;
-            }
-            move_piece(piece.first, piece.second, pre_sq, post_sq);
-            break;
-        case ROOK:
-            if (!check_rook(piece.first, pre_sq, post_sq)){
-                break;
-            }
-            move_piece(piece.first, piece.second, pre_sq, post_sq);
-            break;
-        case QUEEN:
-            if (!check_queen(piece.first, pre_sq, post_sq)){
-                break;
-            }
-            move_piece(piece.first, piece.second, pre_sq, post_sq);
-            break;
-        case KING:
-            if (!check_king(piece.first, pre_sq, post_sq)){
-                break;
-            }
-            move_piece(piece.first, piece.second, pre_sq, post_sq);
-            break;
-        default:
-            break;
-    }
+    color_turn = !color_turn;
+    move_list.push_back(Move(pre_sq, post_sq, p_type, capture_type, change_castling_rights, castle, captured, promoted, en_passant, pc, 0));   
 }
 
 void Board::make_move(Move move){
-    move_piece(sc_board[move.get_pre_sq()].first, sc_board[move.get_pre_sq()].second, move.get_pre_sq(), move.get_post_sq());
+    move_piece(move);
 }
 
 void Board::unmake_move(Move move){
+
+    
+    
+        
     int pre_sq = move.get_pre_sq(), post_sq = move.get_post_sq();
     piece_color pc = sc_board[post_sq].first;
     piece_type pt = sc_board[post_sq].second; 
 
-    bool castle = move.check_castle(), capture = move.check_capture(), promotion = move.check_promoted();
+    bool castle = move.check_castle(), capture = move.check_capture(), promotion = move.check_promoted(), en_passant = move.check_en_passant();
     piece_type p_type = (piece_type)move.get_promoted(), c_type = (piece_type)move.get_captured();
     int new_castling_rights = move.get_castling();
 
+
+    
+    
+
+
+  
+    
+
     update_bitboard(pc, pt, post_sq, pre_sq);
+    sc_board[post_sq].first = NONE;
 
+   
 
+    
     //captured a piece
     if (capture){
-        piece_bbs[pc ^ 1][ALL] = bit_set_to(piece_bbs[pc ^ 1][ALL], post_sq, 1);
-        piece_bbs[pc ^ 1][c_type] = bit_set_to(piece_bbs[pc][c_type], post_sq, 1);
-        sc_board[post_sq] = {(piece_color)(pc ^ 1), c_type};
+        u64 cap_sq = post_sq;
+        if (en_passant){
+            if (pc == WHITE){
+                cap_sq = post_sq - 8;
+            }
+            else{
+                cap_sq = post_sq + 8;
+            }
+        }
+
+        piece_bbs[pc ^ 1][ALL] = bit_set_to(piece_bbs[pc ^ 1][ALL], cap_sq, 1);
+        piece_bbs[pc ^ 1][c_type] = bit_set_to(piece_bbs[pc ^ 1][c_type], cap_sq, 1);
+        sc_board[cap_sq] = {(piece_color)(pc ^ 1), c_type};
+        f_bb = bit_set_to(f_bb, cap_sq, 1);
     }
+
+
     //castle
     if (castle){
+        int rook_prev = 0, rook_post = 0;
         if (pc == WHITE && pre_sq + 2 == post_sq){
-            update_bitboard(pc, ROOK, 5, 7);
+            rook_prev = 7, rook_post = 5;
         }
         else if (pc == WHITE && pre_sq - 2 == post_sq){
-            update_bitboard(pc, ROOK, 3, 0);
+            rook_prev = 0, rook_post = 3;
         } 
         else if (pc == BLACK && pre_sq + 2 == post_sq){
-            update_bitboard(pc, ROOK, 61, 63);
+            rook_prev = 63, rook_post = 61;
         } 
         else if (pc == BLACK && pre_sq - 2 == post_sq){
-            update_bitboard(pc, ROOK, 59, 56);
+            rook_prev = 56, rook_post = 59;
         }
+        update_bitboard(pc, ROOK, rook_post, rook_prev);
+        sc_board[rook_prev] = {pc, ROOK};
+        sc_board[rook_post] = {NONE, ROOK};
         castle = true;
     }
     //castling rights 
-    for (int i = 0; i < 3; ++i){
+    for (int i = 0; i < 4; ++i){
         if ((1 << i) & new_castling_rights){
             castling_rights[i] = true;
         }
     }
+
+
     //promotion
     if (promotion){
         piece_bbs[pc][PAWN] = bit_set_to(piece_bbs[pc][PAWN], pre_sq, 1);
-        piece_bbs[pc][p_type] = bit_set_to(piece_bbs[pc][p_type], pre_sq, 1);
+        piece_bbs[pc][p_type] = bit_set_to(piece_bbs[pc][p_type], pre_sq, 0);
         pt = PAWN;
     }
-
+    
     sc_board[pre_sq] = {pc, pt};
-    white_turn = !white_turn;
+    color_turn = !color_turn;
+    en_passant_sq = move.get_epsq();
     move_list.pop_back();
 }
 
-// std::vector<Move> Board::generate_legal_moves(std::vector<Move> &moves){
-
-//     /*
-//     logic:
-//     king moves (get rid of king and then and all the attack tables)
-
-//     if double check (or more), only king moves
-
-//     if single check 
-//         move king out of check (in king moves)
-//         make capture mask + add psuh mask if sliding
-//             use mask to filter valid moves 
-    
-//     just hard code en passant and castling 
-
-//     */
-
-// }
-
-
-// std::vector<Move> Board::generate_pseudolegal_moves(std::vector<Move> &moves){
-
-//     std::vector<Move> pseudolegal_moves;
-    
-// }

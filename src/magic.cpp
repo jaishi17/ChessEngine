@@ -1,6 +1,7 @@
 #include "board.hpp"
 #include "defs.hpp"
 
+#include <functional>
 #include <iostream>
 #include <random>
 #include <bitset>
@@ -121,8 +122,10 @@ u64 Board::bishop_attack(u64 blockers, int square){
 void Board::generate_rook_magic(){
 
     std::random_device rd;
-    std::default_random_engine generator(rd());
-    std::uniform_int_distribution<u64> distribution(0,0xFFFFFFFFFFFFFFFF);
+    std::mt19937_64 mt(rd());
+    std::uniform_int_distribution<uint64_t> dist;
+
+    auto drawFunc = std::bind(dist, mt);
 
     for (int square = 0; square < 64; ++square){
         bool found_magic = false;
@@ -138,8 +141,9 @@ void Board::generate_rook_magic(){
         }
 
         while (!found_magic){
-            std::vector<bool> visited(1 << rook_shift[square], false);
-            u64 possible_magic = distribution(generator) & distribution(generator) & distribution(generator); //want low bits
+            std::vector<bool> visited(1 << (64 - rook_shift[square]), false);
+            // u64 possible_magic = distribution(generator) & distribution(generator) & distribution(generator); //want low bits
+            u64 possible_magic = drawFunc() & drawFunc() & drawFunc();
             if(std::bitset<64>((blockers * possible_magic) & 0xFFF0000000000000ULL).count() < 6){
                 continue;
             }
@@ -167,8 +171,10 @@ void Board::generate_rook_magic(){
 
 void Board::generate_bishop_magic(){
     std::random_device rd;
-    std::default_random_engine generator(rd());
-    std::uniform_int_distribution<u64> distribution(0,0xFFFFFFFFFFFFFFFF);
+    std::mt19937_64 mt(rd());
+    std::uniform_int_distribution<uint64_t> dist;
+
+    auto drawFunc = std::bind(dist, mt);
 
     for (int square = 0; square < 64; ++square){
         bool found_magic = false;
@@ -184,9 +190,10 @@ void Board::generate_bishop_magic(){
         }
 
         while (!found_magic){
-            std::vector<bool> visited(1 << bishop_shift[square], false);
-            u64 possible_magic = distribution(generator) & distribution(generator) & distribution(generator);
-            if (std::bitset<64>((blockers * possible_magic) & 0xFFF0000000000000).count() < 6){
+            std::vector<bool> visited(1 << (64 - bishop_shift[square]), false);
+            //u64 possible_magic = distribution(generator) & distribution(generator) & distribution(generator);
+            u64 possible_magic = drawFunc() & drawFunc() & drawFunc();
+            if (std::bitset<64>((blockers * possible_magic) & 0xFFF0000000000000ULL).count() < 6){
                 continue;
             }
             bishop_magic[square] = possible_magic;
@@ -217,16 +224,24 @@ void Board::init_magics(){
         rook_table[square].resize(1 << (64 - rook_shift[square]));
         bishop_table[square].resize(1 << (64 - bishop_shift[square]));
     }
-
-    // std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     generate_rook_mask();
     generate_rook_magic();
 
-
     generate_bishop_mask();
     generate_bishop_magic();
+    // std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
 
-    // std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-    // std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
+    // generate_rook_mask();
+    // std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
+    // generate_rook_magic();
+    // std::chrono::steady_clock::time_point t3 = std::chrono::steady_clock::now();
+    // generate_bishop_mask();
+    // std::chrono::steady_clock::time_point t4 = std::chrono::steady_clock::now();
+    // generate_bishop_magic();
+    // std::chrono::steady_clock::time_point t5 = std::chrono::steady_clock::now();
+    // std::cout << "rook mask = " << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count() << "[ms]" << std::endl;
+    // std::cout << "rook magic = " << std::chrono::duration_cast<std::chrono::milliseconds>(t3 - t2).count() << "[ms]" << std::endl;
+    // std::cout << "bishop mask  = " << std::chrono::duration_cast<std::chrono::milliseconds>(t4 - t3).count() << "[ms]" << std::endl;
+    // std::cout << "bishop magic = " << std::chrono::duration_cast<std::chrono::milliseconds>(t5 - t4).count() << "[ms]" << std::endl;
 
 }

@@ -1,10 +1,13 @@
 #include "board.hpp"
 #include <SFML/Graphics.hpp>
 
-#include <vector>
+#include <chrono>
 #include <iostream>
 #include <string>
 
+/*
+
+*/
 
 int loadPosition(const Board& board, std::vector<sf::Sprite> &sprite_pieces){
     int idx = 0;
@@ -36,22 +39,12 @@ int loadPosition(const Board& board, std::vector<sf::Sprite> &sprite_pieces){
 
 int main(){
 
+
     std::string start_position = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR";
     Board board = Board();
 
-    // std::vector<std::string> piece_string = {"WK", "WQ", "WB", "WN", "WR", "WP", "BK", "BQ", "BB", "BN", "BR", "BP", "EM"};
-    // std::vector<std::pair<piece_color, piece_type>> sc_board = board.getSCBoard();
-    // for (int i = 7; i >= 0; --i){
-    //     for (int j = 0; j < 8; ++j){
-    //         std::cout << piece_string[(int)(sc_board[8 * i + j])] << " ";
-    //     }
-    //     std::cout << std::endl;
-    // }
-
-
 
     sf::RenderWindow window(sf::VideoMode(960, 960), "chess engine");
-
     sf::Texture piece_texture, board_texture;
     piece_texture.loadFromFile("../images/pieces2.png");
     board_texture.loadFromFile("../images/board.png");
@@ -67,12 +60,12 @@ int main(){
     }
 
 
+
     int num_pieces_remaining = loadPosition(board, sprite_pieces);
 
     std::string move = "";
     bool isMove = false;
     int moving_piece = 0;
-    float dx = 0, dy = 0;
 
     while (window.isOpen()){
         sf::Vector2i localPosition = sf::Mouse::getPosition(window);
@@ -89,8 +82,6 @@ int main(){
                             if (sprite_pieces[i].getGlobalBounds().contains(localPosition.x, localPosition.y)){
                                 isMove = true;
                                 moving_piece = i;
-                                dx = localPosition.x - sprite_pieces[i].getPosition().x;
-                                dy = localPosition.y - sprite_pieces[i].getPosition().y;
                             }
                         }
                         move += (char)(localPosition.x/square_size + 'a');
@@ -119,7 +110,7 @@ int main(){
         num_pieces_remaining = loadPosition(board, sprite_pieces);
 
         if (isMove){
-            sprite_pieces[moving_piece].setPosition(localPosition.x - dx, localPosition.y - dy);
+            sprite_pieces[moving_piece].setPosition(localPosition.x - square_size/2, localPosition.y - square_size/2);
         }
 
         window.clear();
