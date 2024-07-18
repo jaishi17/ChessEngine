@@ -8,7 +8,9 @@
 #include <map>
 #include <chrono>
 
-
+Move::Move(){
+    move = 0;
+}
 
 Move::Move(int pre_sq, int post_sq, piece_type p_type, piece_type c_type, int castling_rights, bool castle, bool capture, bool promotion, bool en_passant, bool color_turn, int prev_epsq){
     move = 0;
@@ -47,6 +49,10 @@ piece_color Board::get_color(){
     return color_turn ? BLACK : WHITE;
 }
 
+bool Board::get_game_done(){
+    return game_done;
+}
+
 void Board::clearBitboards(){
     for (int i = 0; i < color_count; ++i){
         for (int j = 0; j < piece_count + 1; ++j){
@@ -72,7 +78,7 @@ void Board::setToFen(std::string fen){
 
     int rank = 8, fen_idx = 0;
     char file = 'a';
-    int len = fen.size();
+    // int len = fen.size();
 
     std::map<char, std::pair<piece_color, piece_type>> fen_map = {{'p', {BLACK, PAWN}}, {'n', {BLACK, KNIGHT}}, {'b', {BLACK, BISHOP}}, 
                                                               {'r', {BLACK, ROOK}}, {'q', {BLACK, QUEEN}},{'k', {BLACK, KING}}, 
@@ -134,7 +140,17 @@ void Board::setToFen(std::string fen){
     }
 }
 
-
+void Board::print_result(){
+    if (inCheck(WHITE)){
+        std::cout << "checkmate for black" << std::endl; 
+    }
+    else if (inCheck(BLACK)){
+        std::cout << "checkmate for white" << std::endl;
+    }
+    else{
+        std::cout << "draw" << std::endl;
+    }
+}
 
 void Board::print_square(u64 n){
     for (int i = 7; i >= 0; i--){
@@ -444,87 +460,38 @@ void Board::move_piece(Move move){
     move_list.push_back(move);   
 }
 
-void Board::update(std::string move){
+bool Board::update(std::string move){
+   std::vector<Move> possible_moves = generate_moves();
+
     int pre_sq = 8 * ((int)(move[1] - '1')) + (move[0] - 'a'), post_sq = 8 * ((int)(move[3] - '1')) + (move[2] - 'a');
-    piece_color pc = sc_board[post_sq].first;
-    piece_type pt = sc_board[post_sq].second; 
 
-    update_bitboard(pc, pt, pre_sq, post_sq);
-
-   
-    // to create the move thing 
-    piece_type capture_type = ALL;
-    bool castle, captured, promoted, en_passant = false;
-    int change_castling_rights = 0;
-
-    //capturing a piece
-    if (piece_bbs[pc ^ 1][ALL] & ((u64)1 << post_sq)){
-        piece_bbs[pc ^ 1][ALL] = bit_set_to(piece_bbs[pc ^ 1][ALL], post_sq, 0);
-        std::pair<piece_color, piece_type> piece = sc_board[post_sq];
-        piece_bbs[piece.first][piece.second] = bit_set_to(piece_bbs[piece.first][piece.second], post_sq, 0);
-        captured = true;
-        capture_type = piece.second;
-    }
-    //castle
-    if (pt == KING && (pre_sq + 2 == post_sq || pre_sq - 2 == post_sq)){
-        int rook_prev = 0, rook_post = 0;
-        if (pc == WHITE && pre_sq + 2 == post_sq){
-            rook_prev = 7, rook_post = 5;
+    // std::cout << "num possible moves: " << possible_moves.size() << std::endl; 
+    if (possible_moves.size() == 0){
+        game_done = true;
+        // print_result();
+        if (inCheck((piece_color)color_turn)){
+            return false;
         }
-        else if (pc == WHITE && pre_sq - 2 == post_sq){
-            rook_prev = 0, rook_post = 3;
-        } 
-        else if (pc == BLACK && pre_sq + 2 == post_sq){
-            rook_prev = 63, rook_post = 61;
-        } 
-        else if (pc == BLACK && pre_sq - 2 == post_sq){
-            rook_prev = 56, rook_post = 59;
+        else{
+            return false;
         }
-        update_bitboard(pc, ROOK, rook_prev, rook_post);
-        sc_board[rook_prev].first = NONE;
-        sc_board[rook_post] = {pc, ROOK};
-        castle = true;
     }
 
-    //castling rights
-    if (pt == KING){
-        castling_rights[pc * 2] = false;
-        castling_rights[pc * 2 + 1] = false;
-        change_castling_rights = 3 << (pc * 2);
-    }
-    else if (pt == ROOK){
-        int file = pre_sq % 8;
-        if (file == 0){
-            castling_rights[pc * 2 + 1] = false;
-            change_castling_rights = 2 << (pc * 2); 
-        }
-        else if (file == 7){
+    for (Move &move : possible_moves){
+        if (move.get_pre_sq() == pre_sq && move.get_post_sq() == post_sq){
+            move_piece(move);
+
+            //turn off if uci
+            if (!uci_game){
+                engine_move(-1, -1);
+            }
             
-            castling_rights[pc * 2] = false;
-
-            change_castling_rights = 1 << (pc * 2);
-
+            return true;
         }
     }
-    //promotion
-    piece_type p_type = QUEEN;
-    if (pt == PAWN && pc == WHITE && (pre_sq >> 3) == 6){
-        piece_bbs[WHITE][PAWN] = bit_set_to(piece_bbs[WHITE][PAWN], post_sq, 0);
-        piece_bbs[WHITE][p_type] = bit_set_to(piece_bbs[WHITE][p_type], post_sq, 1);
-        pt = p_type;
-        promoted = true;
-    }
-    else if (pt == PAWN && pc == BLACK && (pre_sq >> 3) == 1){
-        piece_bbs[BLACK][PAWN] = bit_set_to(piece_bbs[BLACK][PAWN], post_sq, 0);
-        piece_bbs[BLACK][p_type] = bit_set_to(piece_bbs[BLACK][p_type], post_sq, 1);
-        pt = p_type;
-        promoted = true;
-    }
 
-    sc_board[pre_sq].first = NONE;
-    sc_board[post_sq] = {pc, pt};
-    color_turn = !color_turn;
-    move_list.push_back(Move(pre_sq, post_sq, p_type, capture_type, change_castling_rights, castle, captured, promoted, en_passant, pc, 0));   
+    return false;
+
 }
 
 void Board::make_move(Move move){
@@ -532,10 +499,6 @@ void Board::make_move(Move move){
 }
 
 void Board::unmake_move(Move move){
-
-    
-    
-        
     int pre_sq = move.get_pre_sq(), post_sq = move.get_post_sq();
     piece_color pc = sc_board[post_sq].first;
     piece_type pt = sc_board[post_sq].second; 
@@ -543,14 +506,6 @@ void Board::unmake_move(Move move){
     bool castle = move.check_castle(), capture = move.check_capture(), promotion = move.check_promoted(), en_passant = move.check_en_passant();
     piece_type p_type = (piece_type)move.get_promoted(), c_type = (piece_type)move.get_captured();
     int new_castling_rights = move.get_castling();
-
-
-    
-    
-
-
-  
-    
 
     update_bitboard(pc, pt, post_sq, pre_sq);
     sc_board[post_sq].first = NONE;
@@ -603,8 +558,6 @@ void Board::unmake_move(Move move){
             castling_rights[i] = true;
         }
     }
-
-
     //promotion
     if (promotion){
         piece_bbs[pc][PAWN] = bit_set_to(piece_bbs[pc][PAWN], pre_sq, 1);
@@ -618,3 +571,28 @@ void Board::unmake_move(Move move){
     move_list.pop_back();
 }
 
+
+//engien stuff
+void Board::set_time(int t, int color){
+    time[color] = t;
+}
+
+void Board::set_engine_color(int color){
+    time[color] = 60000; //engine gets 60 seconds to think;
+
+    engine_color = color;
+
+
+}
+
+int Board::get_engine_color(){
+    return engine_color;
+} 
+
+void Board::set_uci(bool uci){
+    uci_game = uci;
+}
+
+void Board::set_movestogo(int moves){
+    movestogo = moves;
+}

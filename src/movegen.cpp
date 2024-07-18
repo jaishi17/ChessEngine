@@ -9,7 +9,6 @@ void Board::generate_pawn_moves(std::vector<Move> &moves){
     piece_color pc = (piece_color)get_color();
     u64 pawns = piece_bbs[pc][PAWN];
 
-
     while (pawns){
         int pre_sq = lsb(pawns);
         pawns = bit_set_to(pawns, pre_sq, 0);
@@ -26,10 +25,10 @@ void Board::generate_pawn_moves(std::vector<Move> &moves){
             pushes = bit_set_to(pushes, post_sq, 0);
             //promotion
             if ((pc == WHITE && pre_sq >> 3 == 6)|| (pc == BLACK && pre_sq >> 3 == 1)){
-                moves.push_back(add_move(pre_sq, post_sq, 0, false, true, false, KNIGHT));
-                moves.push_back(add_move(pre_sq, post_sq, 0, false, true, false, BISHOP));
+                moves.push_back(add_move(pre_sq, post_sq, 0, false, true, false, QUEEN));
                 moves.push_back(add_move(pre_sq, post_sq, 0, false, true, false, ROOK));
-                moves.push_back(add_move(pre_sq, post_sq, 0, false, true, false, QUEEN));    
+                moves.push_back(add_move(pre_sq, post_sq, 0, false, true, false, BISHOP));
+                moves.push_back(add_move(pre_sq, post_sq, 0, false, true, false, KNIGHT));    
             }
             else{
                 moves.push_back(add_move(pre_sq, post_sq, 0, false, false, false, PAWN));
@@ -50,10 +49,10 @@ void Board::generate_pawn_moves(std::vector<Move> &moves){
             }
             //promotion
             else if ((pc == WHITE && pre_sq >> 3 == 6)|| (pc == BLACK && pre_sq >> 3 == 1)){
-                moves.push_back(add_move(pre_sq, post_sq, 0, false, true, false, KNIGHT));
-                moves.push_back(add_move(pre_sq, post_sq, 0, false, true, false, BISHOP));
-                moves.push_back(add_move(pre_sq, post_sq, 0, false, true, false, ROOK));
                 moves.push_back(add_move(pre_sq, post_sq, 0, false, true, false, QUEEN));
+                moves.push_back(add_move(pre_sq, post_sq, 0, false, true, false, ROOK));
+                moves.push_back(add_move(pre_sq, post_sq, 0, false, true, false, BISHOP));
+                moves.push_back(add_move(pre_sq, post_sq, 0, false, true, false, KNIGHT));   
             }
             else{
                 moves.push_back(add_move(pre_sq, post_sq, 0, false, false, false, PAWN));
@@ -209,30 +208,30 @@ Move Board::add_move(int pre_sq, int post_sq, int castling_rights, bool castling
 
 void Board::show_state(){
 
-    print_square(piece_bbs[WHITE][PAWN]);
-    std::cout << std::endl;
+    // print_square(piece_bbs[WHITE][PAWN]);
+    // std::cout << std::endl;
 
     print_square(f_bb);
     std::cout << std::endl;
-    std::cout << "epsq: " <<  en_passant_sq << std::endl;
+    // std::cout << "epsq: " <<  en_passant_sq << std::endl;
 
-    for (int i = 7; i >= 0; i--){
-        for (int j = 0; j < 8; ++j){
-            if (sc_board[8 * i + j].first == NONE){
-                std::cout << "EM ";
-            }
-            else{
-                // std::cout << sc_board[8 * i + j].first << sc_board[8 * i + j].second << " ";
-                std::cout << pc_str[sc_board[8 * i + j].first] << pt_str[sc_board[8 * i + j].second] << " ";
-            }
-        }
-        std::cout << std::endl;
-    }
+    // for (int i = 7; i >= 0; i--){
+    //     for (int j = 0; j < 8; ++j){
+    //         if (sc_board[8 * i + j].first == NONE){
+    //             std::cout << "EM ";
+    //         }
+    //         else{
+    //             // std::cout << sc_board[8 * i + j].first << sc_board[8 * i + j].second << " ";
+    //             std::cout << pc_str[sc_board[8 * i + j].first] << pt_str[sc_board[8 * i + j].second] << " ";
+    //         }
+    //     }
+    //     std::cout << std::endl;
+    // }
     
 
 }
 
-std::vector<Move> Board::generate_pseudolegal_moves(){
+std::vector<Move> Board::generate_moves(){
 
 
     std::vector<Move> pseudolegal_moves;
@@ -281,7 +280,7 @@ u64 Board::perft(int depth, bool divide){
     u64 nodes = 0;
 
 
-    moves = generate_pseudolegal_moves();
+    moves = generate_moves();
 
 
 

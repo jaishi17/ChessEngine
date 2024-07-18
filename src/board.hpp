@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <chrono>
 
 
 typedef uint64_t u64;
@@ -12,6 +13,7 @@ typedef uint16_t u16;
 
 struct Move{
 
+    Move();
     Move(int pre_sq, int post_sq, piece_type p_type, piece_type c_type, int castling_rights, bool castle, bool capture, bool promotion, bool color_turn, bool en_passant, int prev_epsq);
 
     int get_pre_sq(){
@@ -90,6 +92,7 @@ class Board{
 
         std::vector<std::pair<piece_color, piece_type>> const getSCBoard() const;
         piece_color get_color();
+        bool get_game_done();
 
         //leaping pieces
         void generate_pawn_table();
@@ -132,12 +135,11 @@ class Board{
         //update board
         void update_bitboard(piece_color pc, piece_type pt, int pre_sq, int post_sq);
         void move_piece(Move move);
-        void update(std::string move);
+        bool update(std::string move);
         void make_move(Move move); 
         void unmake_move(Move move); 
 
         //move generation - movegen.cpp
-        // std::vector<Move> generate_legal_moves(std::vector<Move> &moves);
         void generate_pawn_moves(std::vector<Move> &moves);
         void generate_knight_moves(std::vector<Move> &moves);
         void generate_bishop_moves(std::vector<Move> &moves);
@@ -145,15 +147,28 @@ class Board{
         void generate_queen_moves(std::vector<Move> &moves);
         void generate_king_moves(std::vector<Move> &moves);
         Move add_move(int pre_sq, int post_sq, int castling_rights, bool castling, bool promotion, bool en_passant, piece_type p_type);
-        std::vector<Move> generate_pseudolegal_moves();
+        std::vector<Move> generate_moves();
 
+        //debug 
         void show_state();
         u64 perft(int depth, bool divide = false);
 
-        bool debug = false;
+        //evaluation 
+        int evaluate();
+        int search(int depth, int alpha, int beta, bool compute_move);
+        int capture_search(int alpha, int beta);
+        void engine_move(int depth, int time);
 
+        //engine
+        void print_result();
+        void set_time(int time, int color);
+        void set_engine_color(int color);
+        int get_engine_color();
+        int compute_time();
+        void set_uci(bool uci);
+        void set_movestogo(int moves);
+        
     private:
-
 
         bool castling_rights[4] = {true, true, true, true}; //WK, WQ, BK, bQ
         bool color_turn = false; //white = 0, black = 1
@@ -171,6 +186,16 @@ class Board{
         u64 knight_table[64], king_table[64], pawn_push[2][64], pawn_attack[2][64];
         u64 rook_magic[64], rook_mask[64], bishop_magic[64], bishop_mask[64];
         std::vector<u64> rook_table[64], bishop_table[64];
+
+        //engine 
+        Move best_move;
+        bool uci_game = true;
+        bool game_done = false;
+        bool engine_color = 1;
+        int time[2]; //in milliseconds
+        std::chrono::time_point<std::chrono::system_clock> end_search_time;
+        int movestogo = 0;
+        int time_control_type = 0;  //0 for sudden death, 1 for repeating 
 
 };
 
