@@ -3,6 +3,7 @@ UCI compatible C++ chess engine.
 ## Features 
 
 #### Representation / Move generation 
+* Fen parsing
 * Bitboards
 * Magic bitboards for sliding pieces
 * Pseudo-legal Move Generation
