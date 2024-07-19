@@ -1,4 +1,6 @@
 #include "board.hpp"
+#include "zobrist.hpp"
+#include "magic.hpp"
 #include <SFML/Graphics.hpp>
 
 #include <vector>
@@ -19,23 +21,12 @@ Move::Move(int pre_sq, int post_sq, piece_type p_type, piece_type c_type, int ca
 }
 
 Board::Board(){
-    init_Board();
     setToFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 ");
 }
 
 Board::Board(std::string fen){
-    init_Board();
     setToFen(fen);
 
-    
-}
-
-void Board::init_Board(){
-
-    generate_pawn_table();
-    generate_knight_table();
-    generate_king_table();
-    init_magics();
     
 }
 
@@ -175,71 +166,6 @@ void Board::print_square(u64 n, int square){
     }
 }
 
-void Board::generate_pawn_table(){
-
-    for (int i = 0; i < 64; ++i){
-        pawn_push[0][i] = 0;
-        pawn_attack[0][i] = 0;
-        //white 
-        if (i < 56){
-            pawn_push[0][i] = bit_set_to(pawn_push[0][i], i + 8, 1);
-            if ((int)i/8 == 1){
-                pawn_push[0][i] = bit_set_to(pawn_push[0][i], i + 16, 1);
-            }
-            if (i % 8 != 0){
-                pawn_attack[0][i] = bit_set_to(pawn_attack[0][i], i + 7, 1);
-            }
-            if (i % 8 != 7){
-                pawn_attack[0][i] = bit_set_to(pawn_attack[0][i], i + 9, 1);
-            }
-        }
-        
-        pawn_push[1][i] = 0;
-        pawn_attack[1][i] = 0;
-        //black
-        if (i > 7){
-            pawn_push[1][i] = bit_set_to(pawn_push[1][i], i - 8, 1);
-            if ((int)i/8 == 6){
-                pawn_push[1][i] = bit_set_to(pawn_push[1][i], i - 16, 1);
-            }
-            if (i % 8 != 0){
-                pawn_attack[1][i] = bit_set_to(pawn_attack[1][i], i - 9, 1);
-            }
-            if (i % 8 != 7){
-                pawn_attack[1][i] = bit_set_to(pawn_attack[1][i], i - 7, 1);
-            }
-        }
-    }
-
-}
-
-void Board::generate_knight_table(){
-    std::vector<int> moves = {10, 17, 15, 6, -10, -17, -15, -6};
-    std::vector<u64> banned_files = {G_FILE | H_FILE, H_FILE, A_FILE, A_FILE | B_FILE, A_FILE | B_FILE, A_FILE, H_FILE, G_FILE | H_FILE};
-
-    for (int i = 0; i < 64; ++i){
-        knight_table[i] = 0;
-        for (int k = 0; k < 8; ++k){
-            if (0 <= i + moves[k] && i + moves[k] <= 63 && !(1 & (banned_files[k] >> i))){
-                knight_table[i] = bit_set_to(knight_table[i], i + moves[k], 1);
-            }
-        }
-    }
-}
-
-void Board::generate_king_table(){
-    std::vector<int> moves = {1, 9, 8, 7, -1, -9, -8, -7};
-    std::vector<u64> banned_files = {H_FILE, H_FILE, (u64)0, A_FILE, A_FILE, A_FILE, (u64)0, H_FILE};
-
-    for (int i = 0; i < 64; ++i){
-        king_table[i] = 0;
-        for (int k = 0; k < 8; ++k){
-            if (0 <= i + moves[k] && i + moves[k] <= 63 && !(1 & (banned_files[k] >> i))){
-                king_table[i] = bit_set_to(king_table[i], i + moves[k], 1);
-            }
-        }
-    }
-}
 
 bool Board::check_pawn(piece_color pc, int pre_sq, int post_sq){
     u64 push = pawn_push[pc][pre_sq] & ~(f_bb);
@@ -389,6 +315,7 @@ void Board::move_piece(Move move){
     piece_color pc = sc_board[pre_sq].first;
     piece_type pt = sc_board[pre_sq].second; 
 
+
     bool castle = move.check_castle(), capture = move.check_capture(), promotion = move.check_promoted(), en_passant = move.check_en_passant();
     piece_type p_type = (piece_type)move.get_promoted(), c_type = (piece_type)move.get_captured();
     int new_castling_rights = move.get_castling();
@@ -454,6 +381,10 @@ void Board::move_piece(Move move){
         en_passant_sq = pre_sq - 8;
     }
 
+    
+    zhash_moves.push_back(get_zhash());
+    // ztable[get_zhash() & ((1 << zobrist_size) - 1)]++;
+
     sc_board[pre_sq].first = NONE;
     sc_board[post_sq] = {pc, pt};
     color_turn = !color_turn;
@@ -502,6 +433,8 @@ void Board::unmake_move(Move move){
     int pre_sq = move.get_pre_sq(), post_sq = move.get_post_sq();
     piece_color pc = sc_board[post_sq].first;
     piece_type pt = sc_board[post_sq].second; 
+
+
 
     bool castle = move.check_castle(), capture = move.check_capture(), promotion = move.check_promoted(), en_passant = move.check_en_passant();
     piece_type p_type = (piece_type)move.get_promoted(), c_type = (piece_type)move.get_captured();
@@ -564,11 +497,18 @@ void Board::unmake_move(Move move){
         piece_bbs[pc][p_type] = bit_set_to(piece_bbs[pc][p_type], pre_sq, 0);
         pt = PAWN;
     }
-    
+
+   
+    zhash_moves.pop_back();
+    // ztable[get_zhash() & ((1 << zobrist_size) - 1)]--;
+
+
     sc_board[pre_sq] = {pc, pt};
     color_turn = !color_turn;
     en_passant_sq = move.get_epsq();
     move_list.pop_back();
+
+
 }
 
 
@@ -595,4 +535,21 @@ void Board::set_uci(bool uci){
 
 void Board::set_movestogo(int moves){
     movestogo = moves;
+}
+
+void Board::set_time_inc(int inc, int color){
+    time_inc[color] = inc;
+}
+
+u64 Board::get_zhash(){
+
+    u64 zhash = 0;
+    
+    for (int i = 0; i < 64; ++i){
+        if (sc_board[i].first != NONE){
+            zhash ^= zobrist_keys[sc_board[i].first][sc_board[i].second][i];
+        }
+    }
+
+    return zhash;
 }

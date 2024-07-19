@@ -1,13 +1,20 @@
 #include "board.hpp"
 #include "defs.hpp"
+#include "zobrist.hpp"
+#include "magic.hpp"
 
 #include <vector>
 #include <bitset>
 #include <iostream>
 #include <chrono>
+#include <cmath>
+#include <algorithm>
+
 
 const int n_inf = -1000000;
-const int piece_value[6] = {100, 300, 300, 500, 900, 10000};
+
+int piece_value_mid[6] = { 82, 337, 365, 477, 1025,  0};
+int piece_value_end[6] = { 94, 281, 297, 512,  936,  0};
 const int perspective[2] = {1, -1};
 
 int pawn_pst_mid[64] = {
@@ -163,29 +170,83 @@ int Board::evaluate(){
 
     for (int i = 0; i < 64; ++i){
         if (sc_board[i].first == WHITE){
-            mid_eval += (piece_value[sc_board[i].second] + piece_pst_mid[sc_board[i].second][i]);
-            end_eval += (piece_value[sc_board[i].second] + piece_pst_end[sc_board[i].second][i]);
+            int sq = i ^ 56;
+            mid_eval += (piece_value_mid[sc_board[i].second] + piece_pst_mid[sc_board[i].second][sq]);
+            end_eval += (piece_value_end[sc_board[i].second] + piece_pst_end[sc_board[i].second][sq]);
             phase += piece_phase[sc_board[i].second];
         }
         else if (sc_board[i].first == BLACK){
-            int sq = i ^ 56;
-            mid_eval -= (piece_value[sc_board[i].second] + piece_pst_mid[sc_board[i].second][sq]);
-            end_eval -= (piece_value[sc_board[i].second] + piece_pst_end[sc_board[i].second][sq]); 
+            int sq = i; 
+            mid_eval -= (piece_value_mid[sc_board[i].second] + piece_pst_mid[sc_board[i].second][sq]);
+            end_eval -= (piece_value_end[sc_board[i].second] + piece_pst_end[sc_board[i].second][sq]); 
             phase += piece_phase[sc_board[i].second];
        }
     }
 
-    return perspective[color_turn] * (mid_eval * phase + end_eval * (24 - phase))/24;
+
+    int wking_pos = lsb(piece_bbs[WHITE][KING]), bking_pos = lsb(piece_bbs[BLACK][KING]);
+    int dist = std::abs((wking_pos >> 3) - (bking_pos >> 3)) + std::abs((wking_pos % 8) - (bking_pos % 8));
+
+    mid_eval *= perspective[color_turn];
+    end_eval *= perspective[color_turn];
+
+    if (mid_eval * phase + end_eval * (24 - phase) > 0){ //winning for the color to move, so shld bring king closer
+        end_eval += (14 - dist) ;
+    }
+    else {
+        end_eval -= (14 - dist) ;
+    }
+
+    // end_eval += (14 - dist) * 10;
+
+
+    return (mid_eval * phase + end_eval * (24 - phase))/24;
+}
+
+void Board::sort_moves(std::vector<Move> &moves){
+    std::vector<std::pair<int, Move>> move_scores(moves.size());
+
+    int idx = 0;
+    for (Move &move : moves){
+
+        int move_score = 0;
+
+        piece_type pt = sc_board[move.get_pre_sq()].second;
+
+        if (move.check_capture()){
+            move_score += 10 * piece_value_mid[move.get_captured()] - piece_value_mid[pt];
+        }
+
+        // square attacked by pawn
+        if (piece_bbs[color_turn ^ 1][PAWN] & pawn_attack[color_turn][move.get_post_sq()]){
+            move_score -= piece_value_mid[pt];
+        }
+
+        // std::cout << squares_RF_str[move.get_pre_sq()] << squares_RF_str[move.get_post_sq()] << " eval: " << move_score << std::endl;
+
+        move_scores[idx++] = std::make_pair(move_score, move);
+
+
+    }
+    std::sort(move_scores.begin(), move_scores.end(), std::greater<>());
+
+    for (size_t i = 0; i < moves.size(); ++i){
+        moves[i] = move_scores[i].second;
+    }
+
 }
 
 int Board::capture_search(int alpha, int beta){
     int eval = evaluate();
     if (eval >= beta){
-            return beta;
-        }
+        return beta;
+    }
     alpha = std::max(alpha, eval);
 
-    std::vector<Move> moves = generate_moves();
+
+    std::vector<Move> moves = generate_moves(true);
+    sort_moves(moves); // to test
+
 
     for (Move &move : moves){
         if (move.get_captured()){
@@ -207,12 +268,29 @@ int Board::capture_search(int alpha, int beta){
 }
 
 int Board::search(int depth, int alpha, int beta, bool compute_move){
+
+    u64 curr_zhash = get_zhash();
+    int amnt = 0;
+    for (int i = zhash_moves.size() - 1; i >= 0; i--){
+        if (zhash_moves[i] == curr_zhash){
+            amnt++;
+        }
+        if (amnt >= 3){
+            return -10;
+        }
+    }
+
+
+
     if (depth == 0){
-        // return capture_search(alpha, beta);
-        return evaluate();
+        return capture_search(alpha, beta); // fix this 
+        // return evaluate();
     }
 
     std::vector<Move> moves = generate_moves();
+    sort_moves(moves); // to test
+    
+
     //checkmate / draw
     if (moves.size() == 0){
         if (compute_move){
@@ -230,6 +308,7 @@ int Board::search(int depth, int alpha, int beta, bool compute_move){
     
     Move temp_best_move = Move();
 
+
     for (Move &move : moves){
         make_move(move);
         int eval = -1 * search(depth - 1, -beta, -alpha,  false);
@@ -243,14 +322,14 @@ int Board::search(int depth, int alpha, int beta, bool compute_move){
         }
 
         // if (depth == 4 && compute_move){
-        //     std::cout << "bestmove " << squares_RF_str[move.get_pre_sq()] << squares_RF_str[move.get_post_sq()]  << ": " << eval << std::endl;
+        //     std::cout << squares_RF_str[move.get_pre_sq()] << squares_RF_str[move.get_post_sq()] << " eval: " << eval << std::endl;
         // }
      
-
-        if (eval >= beta){
-            return beta;
-        }
         alpha = std::max(alpha, eval);
+
+        if (alpha >= beta){
+            break;
+        }
 
         if (std::chrono::system_clock::now() > end_search_time){
             return 0;
@@ -271,10 +350,10 @@ int Board::search(int depth, int alpha, int beta, bool compute_move){
 
 int Board::compute_time(){
     if (time_control_type == 0){
-        return time[engine_color] / 20;
+        return time[color_turn] / 30;
     }
     else{
-        return time[engine_color] / (movestogo+2);
+        return time[color_turn] / (movestogo+2);
     }
 }
 
@@ -285,6 +364,7 @@ void Board::engine_move(int uci_depth, int uci_time){
     // set_engine_color(color_turn);
 
     if (uci_depth != -1){
+        end_search_time = std::chrono::system_clock::now() + std::chrono::milliseconds(10000000);
         search(uci_depth, n_inf * 2, n_inf * -2, true);
     }
     else{
@@ -292,16 +372,23 @@ void Board::engine_move(int uci_depth, int uci_time){
             uci_time = compute_time();
         }
         end_search_time = std::chrono::system_clock::now() + std::chrono::milliseconds(uci_time);
-
         int depth = 0;
         while (std::chrono::system_clock::now() < end_search_time){
+
             depth++;
             int eval = search(depth, n_inf * 2, n_inf * -2, true);
-            if (eval == n_inf){ //has checkmate
+            // std::cout << "info depth: " << depth << " eval: " << eval << std::endl;
+
+            if (eval == -1 * n_inf){ //has checkmate
+                // std::cout << "info has checkmate" << std::endl;
                 break;
             }
 
+
         }
+
+        std::cout << "info (used) depth: " << depth - 1 << std::endl;
+
 
     }
 
@@ -321,10 +408,10 @@ void Board::engine_move(int uci_depth, int uci_time){
     else{
         std::cout << "bestmove " << squares_RF_str[best_move.get_pre_sq()] << squares_RF_str[best_move.get_post_sq()] << std::endl;
     }
-    std::cout << "info eval: " << evaluate() * perspective[color_turn] << std::endl;
+    // std::cout << "info eval: " << evaluate() * perspective[color_turn] << std::endl;
 
     std::chrono::steady_clock::time_point end_time = std::chrono::steady_clock::now();
     time[engine_color] -= std::chrono::duration_cast<std::chrono::milliseconds>(end_time - begin_time).count();
-    // std::cout << "time left for engine: " << time[engine_color] << "[ms]" << std::endl;
+    // std::cout << "info time left for engine: " << time[engine_color] << "[ms]" << std::endl;
 
 }

@@ -8,32 +8,103 @@
 #include <chrono>
 
 
-int Board::rook_hash(u64 blockers, int square){
+u64 knight_table[64], king_table[64], pawn_push[2][64], pawn_attack[2][64];
+u64 rook_magic[64], rook_mask[64], bishop_magic[64], bishop_mask[64];
+std::vector<u64> rook_table[64], bishop_table[64];
+
+
+void generate_pawn_table(){
+
+    for (int i = 0; i < 64; ++i){
+        pawn_push[0][i] = 0;
+        pawn_attack[0][i] = 0;
+        //white 
+        if (i < 56){
+            pawn_push[0][i] = bit_set_to(pawn_push[0][i], i + 8, 1);
+            if ((int)i/8 == 1){
+                pawn_push[0][i] = bit_set_to(pawn_push[0][i], i + 16, 1);
+            }
+            if (i % 8 != 0){
+                pawn_attack[0][i] = bit_set_to(pawn_attack[0][i], i + 7, 1);
+            }
+            if (i % 8 != 7){
+                pawn_attack[0][i] = bit_set_to(pawn_attack[0][i], i + 9, 1);
+            }
+        }
+        
+        pawn_push[1][i] = 0;
+        pawn_attack[1][i] = 0;
+        //black
+        if (i > 7){
+            pawn_push[1][i] = bit_set_to(pawn_push[1][i], i - 8, 1);
+            if ((int)i/8 == 6){
+                pawn_push[1][i] = bit_set_to(pawn_push[1][i], i - 16, 1);
+            }
+            if (i % 8 != 0){
+                pawn_attack[1][i] = bit_set_to(pawn_attack[1][i], i - 9, 1);
+            }
+            if (i % 8 != 7){
+                pawn_attack[1][i] = bit_set_to(pawn_attack[1][i], i - 7, 1);
+            }
+        }
+    }
+
+}
+
+void generate_knight_table(){
+    std::vector<int> moves = {10, 17, 15, 6, -10, -17, -15, -6};
+    std::vector<u64> banned_files = {G_FILE | H_FILE, H_FILE, A_FILE, A_FILE | B_FILE, A_FILE | B_FILE, A_FILE, H_FILE, G_FILE | H_FILE};
+
+    for (int i = 0; i < 64; ++i){
+        knight_table[i] = 0;
+        for (int k = 0; k < 8; ++k){
+            if (0 <= i + moves[k] && i + moves[k] <= 63 && !(1 & (banned_files[k] >> i))){
+                knight_table[i] = bit_set_to(knight_table[i], i + moves[k], 1);
+            }
+        }
+    }
+}
+
+void generate_king_table(){
+    std::vector<int> moves = {1, 9, 8, 7, -1, -9, -8, -7};
+    std::vector<u64> banned_files = {H_FILE, H_FILE, (u64)0, A_FILE, A_FILE, A_FILE, (u64)0, H_FILE};
+
+    for (int i = 0; i < 64; ++i){
+        king_table[i] = 0;
+        for (int k = 0; k < 8; ++k){
+            if (0 <= i + moves[k] && i + moves[k] <= 63 && !(1 & (banned_files[k] >> i))){
+                king_table[i] = bit_set_to(king_table[i], i + moves[k], 1);
+            }
+        }
+    }
+}
+
+int rook_hash(u64 blockers, int square){
     return (blockers * rook_magic[square]) >> (rook_shift[square]);
 }
 
-int Board::bishop_hash(u64 blockers, int square){
+int bishop_hash(u64 blockers, int square){
     return (blockers * bishop_magic[square]) >> bishop_shift[square];
 }
 
-u64 Board::rook_moves(u64 blockers, int square){
+u64 rook_moves(u64 blockers, int square){
     blockers &= rook_mask[square];
     int key = rook_hash(blockers, square);
     return rook_table[square][key];
 }
 
-u64 Board::bishop_moves(u64 blockers, int square){
+u64 bishop_moves(u64 blockers, int square){
     blockers &= bishop_mask[square];
     int key = bishop_hash(blockers, square);
     return bishop_table[square][key];
 }
 
-u64 Board::queen_moves(u64 blockers, int square){
+u64 queen_moves(u64 blockers, int square){
     return bishop_moves(blockers, square) | rook_moves(blockers, square);
 }
 
 
-void Board::generate_rook_mask(){
+void generate_rook_mask(){
     //rook masks
     for (int i = 0; i < 64; ++i){
         rook_mask[i] = (u64)0;
@@ -48,7 +119,7 @@ void Board::generate_rook_mask(){
     }
 }
 
-void Board::generate_bishop_mask(){
+void generate_bishop_mask(){
 
     std::vector<std::pair<int, int>> dir = {{-1, -1}, {1, -1}, {-1, 1}, {1, 1}};
 
@@ -70,7 +141,7 @@ void Board::generate_bishop_mask(){
     }
 }
 
-u64 Board::rook_attack(u64 blockers, int square){
+u64 rook_attack(u64 blockers, int square){
     std::vector<std::pair<int, int>> dir = {{0, 1}, {0, -1}, {-1, 0}, {1, 0}};
 
     u64 attacks = 0;
@@ -95,7 +166,7 @@ u64 Board::rook_attack(u64 blockers, int square){
 
 }
 
-u64 Board::bishop_attack(u64 blockers, int square){
+u64 bishop_attack(u64 blockers, int square){
     std::vector<std::pair<int, int>> dir = {{1, 1}, {1, -1}, {-1, 1}, {-1, -1}};
 
     u64 attacks = 0;
@@ -119,7 +190,7 @@ u64 Board::bishop_attack(u64 blockers, int square){
     return attacks;
 }
 
-void Board::generate_rook_magic(){
+void generate_rook_magic(){
 
     std::random_device rd;
     std::mt19937_64 mt(rd());
@@ -169,7 +240,7 @@ void Board::generate_rook_magic(){
 
 }
 
-void Board::generate_bishop_magic(){
+void generate_bishop_magic(){
     std::random_device rd;
     std::mt19937_64 mt(rd());
     std::uniform_int_distribution<uint64_t> dist;
@@ -219,7 +290,7 @@ void Board::generate_bishop_magic(){
 }
 
 
-void Board::init_magics(){
+void init_magics(){
     for (int square = 0; square < 64; ++square){
         rook_table[square].resize(1 << (64 - rook_shift[square]));
         bishop_table[square].resize(1 << (64 - bishop_shift[square]));

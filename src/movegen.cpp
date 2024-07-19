@@ -1,5 +1,6 @@
 #include "board.hpp"
 #include "defs.hpp"
+#include "magic.hpp"
 
 #include <iostream>
 #include <string>
@@ -231,7 +232,7 @@ void Board::show_state(){
 
 }
 
-std::vector<Move> Board::generate_moves(){
+std::vector<Move> Board::generate_moves(bool capture){
 
 
     std::vector<Move> pseudolegal_moves;
@@ -261,7 +262,9 @@ std::vector<Move> Board::generate_moves(){
         make_move(move);    
    
         if (!inCheck((piece_color)move.get_color_turn())){
-            legal_moves.push_back(move);
+            if (!capture || move.check_capture()){
+                legal_moves.push_back(move);
+            }
         }
         unmake_move(move);
         

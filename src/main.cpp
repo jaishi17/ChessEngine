@@ -1,5 +1,7 @@
 #include "board.hpp"
 #include "uci.hpp"
+#include "zobrist.hpp"
+#include "magic.hpp"
 #include <SFML/Graphics.hpp>
 
 #include <chrono>
@@ -38,19 +40,33 @@ int loadPosition(Board& board, std::vector<sf::Sprite> &sprite_pieces){
     return idx;
 }
 
+void init_tables(){
+    init_zobrist_keys();
+    generate_pawn_table();
+    generate_knight_table();
+    generate_king_table();
+    init_magics();
+}
+
 int main() {
+
+    init_tables();
+    
     uci_loop();
     return 0;
 }
 
 int main2(int argc, char * argv[]){
 
+    init_tables();
 
+    
 
-    std::string start_position = "8/8/8/8/2k5/8/r3p1r1/2K2R2 b - - 0 1";
-    bool start_pos = false;
-    Board board = Board(start_position);
+    std::string start_position = "6r1/pp6/1kp2B2/2qp1b2/5N2/1B1P2K1/PP3PP1/4Q3 w - - 2 40";
+    // std::string start_position = "r1b1k1nr/pppp1ppp/2nbpq2/4P3/3P4/2P1BN2/PP3PPP/RN1QKB1R b KQkq - 0 6";
+    Board board = Board();
 
+    // std::cout << "current pos eval: " << board.evaluate() << std::endl;
 
     sf::RenderWindow window(sf::VideoMode(960, 960), "chess engine");
     sf::Texture piece_texture, board_texture;
@@ -85,7 +101,7 @@ int main2(int argc, char * argv[]){
     }
 
     board.set_engine_color(engine_color);
-    if (engine_color && start_pos){
+    if (engine_color == board.get_color()){
         board.engine_move(-1, -1);
     }
     

@@ -76,7 +76,7 @@ void uci_position(Board &board, std::vector<std::string> commands){
             }
             board = Board(fen_string);
         }
-        idx++;
+        
         while (idx < commands.size()){
             board.update(commands[idx++]);
         }
@@ -94,6 +94,12 @@ void uci_go(Board &board, std::vector<std::string> commands){
         }
         else if (arg == "btime"){
             board.set_time(stoi(commands[idx++]), 1);
+        }
+        else if (arg == "winc"){
+            board.set_time_inc(stoi(commands[idx++]), 0);
+        }
+        else if (arg == "binc"){
+            board.set_time_inc(stoi(commands[idx++]), 1);
         }
         else if (arg == "movestogo"){
             board.set_movestogo(stoi(commands[idx++]));

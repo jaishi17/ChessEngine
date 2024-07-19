@@ -1,12 +1,13 @@
 #ifndef board_h
 #define board_h
 #include "defs.hpp"
+// #include "zobrist.hpp"
 
 #include <cstdint>
 #include <string>
 #include <vector>
 #include <chrono>
-
+#include <unordered_map>
 
 typedef uint64_t u64;
 typedef uint16_t u16;
@@ -28,7 +29,7 @@ struct Move{
     }
 
     inline int get_captured(){
-        return (move >> 15) & 0x7;
+        return (move >> 15) & 0x7 ;
     }
     inline int get_castling(){
         return (move >> 18) & 0xF;
@@ -57,6 +58,11 @@ struct Move{
     inline int get_epsq(){
         return (move >> 27) & 0x3F;
     }
+
+    inline bool operator<(const Move &y) const { 
+        return move < y.move; 
+    }
+
     
 
     u64 move;
@@ -93,32 +99,6 @@ class Board{
         std::vector<std::pair<piece_color, piece_type>> const getSCBoard() const;
         piece_color get_color();
         bool get_game_done();
-
-        //leaping pieces
-        void generate_pawn_table();
-        void generate_knight_table();
-        void generate_king_table();
-
-        //sliding pieces magic stuff - in magic.cpp
-        void init_magics();
-
-        u64 rook_moves(u64 blockers, int square);
-        u64 bishop_moves(u64 blockers, int square);
-        u64 queen_moves(u64 blockers, int square);
-
-        int rook_hash(u64 blockers, int square);
-        int bishop_hash(u64 blockers, int square);
-
-        void generate_rook_mask();
-        void generate_rook_magic();
-
-        void generate_bishop_mask();
-        void generate_bishop_magic();
-
-        u64 rook_attack(u64 blockers, int square);
-        u64 bishop_attack(u64 blockers, int square);
-        
-
         
         // check pseudo-legality
         bool check_pawn(piece_color pc, int pre_sq, int post_sq);
@@ -147,7 +127,7 @@ class Board{
         void generate_queen_moves(std::vector<Move> &moves);
         void generate_king_moves(std::vector<Move> &moves);
         Move add_move(int pre_sq, int post_sq, int castling_rights, bool castling, bool promotion, bool en_passant, piece_type p_type);
-        std::vector<Move> generate_moves();
+        std::vector<Move> generate_moves(bool capture = false);
 
         //debug 
         void show_state();
@@ -155,6 +135,7 @@ class Board{
 
         //evaluation 
         int evaluate();
+        void sort_moves(std::vector<Move> &moves);
         int search(int depth, int alpha, int beta, bool compute_move);
         int capture_search(int alpha, int beta);
         void engine_move(int depth, int time);
@@ -167,6 +148,10 @@ class Board{
         int compute_time();
         void set_uci(bool uci);
         void set_movestogo(int moves);
+        void set_time_inc(int inc, int color);
+
+        //misc 
+        u64 get_zhash();
         
     private:
 
@@ -182,21 +167,17 @@ class Board{
         u64 piece_bbs[color_count][piece_count + 1], f_bb;  
         std::vector<std::pair<piece_color, piece_type>> sc_board = std::vector<std::pair<piece_color, piece_type>>(64);
 
-        //tables for move generation/checking
-        u64 knight_table[64], king_table[64], pawn_push[2][64], pawn_attack[2][64];
-        u64 rook_magic[64], rook_mask[64], bishop_magic[64], bishop_mask[64];
-        std::vector<u64> rook_table[64], bishop_table[64];
-
         //engine 
         Move best_move;
         bool uci_game = true;
         bool game_done = false;
         bool engine_color = 1;
         int time[2]; //in milliseconds
+        int time_inc[2];
         std::chrono::time_point<std::chrono::system_clock> end_search_time;
         int movestogo = 0;
         int time_control_type = 0;  //0 for sudden death, 1 for repeating 
-
+        std::vector<u64> zhash_moves;
 };
 
 #endif
