@@ -76,11 +76,17 @@ void uci_position(Board &board, std::vector<std::string> commands){
             }
             board = Board(fen_string);
         }
-        
+        idx++;
         while (idx < commands.size()){
-            board.update(commands[idx++]);
+            // std::cout << "A)" << commands[idx] << ": "  << std::hex << board.zhash_pos << std::endl;
+            board.update(commands[idx]);
+            // std::cout << "B)" << commands[idx] << ": "  << std::hex << board.zhash_pos << std::endl;
+
+            idx++;
         }
+
     }
+    // std::cout << std::hex << board.zhash_pos << std::endl;
 }
 
 void uci_go(Board &board, std::vector<std::string> commands){
@@ -90,7 +96,6 @@ void uci_go(Board &board, std::vector<std::string> commands){
         std::string arg = commands[idx++];
         if (arg == "wtime"){
             board.set_time(stoi(commands[idx++]), 0);
-            std::cout << "info string reached\n";
         }
         else if (arg == "btime"){
             board.set_time(stoi(commands[idx++]), 1);

@@ -81,10 +81,17 @@ void Board::generate_knight_moves(std::vector<Move> &moves){
 void Board::generate_bishop_moves(std::vector<Move> &moves){
     piece_color pc = (piece_color)get_color();
     u64 bishops = piece_bbs[pc][BISHOP];
+
+
     while (bishops){
         int pre_sq = lsb(bishops);
         bishops = bit_set_to(bishops, pre_sq, 0);
+
+
         u64 attacks = bishop_moves(f_bb, pre_sq) & ~(piece_bbs[pc][ALL]);
+
+
+
         while(attacks){
             int post_sq = lsb(attacks);
             attacks = bit_set_to(attacks, post_sq, 0);
@@ -183,7 +190,7 @@ Move Board::add_move(int pre_sq, int post_sq, int castling_rights, bool castling
     piece_color pc = sc_board[pre_sq].first;
     // piece_type pt = sc_board[pre_sq].second; 
 
-    bool captured = false;
+    bool captured = false; 
     piece_type  c_type = ALL;
 
     
@@ -195,39 +202,28 @@ Move Board::add_move(int pre_sq, int post_sq, int castling_rights, bool castling
     if (en_passant){
         captured = true;
         c_type = PAWN;  
-        if (pc == WHITE && post_sq == pre_sq + 16){
-            en_passant_sq = pre_sq + 8;
-        } 
-        else if (pc == BLACK && post_sq == pre_sq - 16){
-            en_passant_sq = pre_sq - 8;
-        }
     }
+
    
 
-    return Move(pre_sq, post_sq, p_type, c_type, castling_rights, castling, captured, promotion, en_passant, (int)pc, en_passant_sq);
+    return Move(pre_sq, post_sq, p_type, c_type, castling_rights, castling, captured, promotion, en_passant, en_passant_sq);
 }
 
 void Board::show_state(){
 
-    // print_square(piece_bbs[WHITE][PAWN]);
-    // std::cout << std::endl;
 
-    print_square(f_bb);
-    std::cout << std::endl;
-    // std::cout << "epsq: " <<  en_passant_sq << std::endl;
-
-    // for (int i = 7; i >= 0; i--){
-    //     for (int j = 0; j < 8; ++j){
-    //         if (sc_board[8 * i + j].first == NONE){
-    //             std::cout << "EM ";
-    //         }
-    //         else{
-    //             // std::cout << sc_board[8 * i + j].first << sc_board[8 * i + j].second << " ";
-    //             std::cout << pc_str[sc_board[8 * i + j].first] << pt_str[sc_board[8 * i + j].second] << " ";
-    //         }
-    //     }
-    //     std::cout << std::endl;
-    // }
+    for (int i = 7; i >= 0; i--){
+        for (int j = 0; j < 8; ++j){
+            if (sc_board[8 * i + j].first == NONE){
+                std::cout << "   ";
+            }
+            else{
+                // std::cout << sc_board[8 * i + j].first << sc_board[8 * i + j].second << " ";
+                std::cout << pc_str[sc_board[8 * i + j].first] << pt_str[sc_board[8 * i + j].second] << " ";
+            }
+        }
+        std::cout << std::endl;
+    }
     
 
 }
@@ -238,36 +234,40 @@ std::vector<Move> Board::generate_moves(bool capture){
     std::vector<Move> pseudolegal_moves;
     pseudolegal_moves.reserve(35); //average
 
-    std::vector<int> num_moves(6);
+    // std::vector<int> num_moves(6);
     // int idx = 0, pt = 0;
-    std::vector<std::string> pts = {"pawn", "knight", "bishop", "rook", "queen", "king"};
+    // std::vector<std::string> pts = {"pawn", "knight", "bishop", "rook", "queen", "king"};
 
 
     generate_pawn_moves(pseudolegal_moves); // good
-    num_moves[0] = pseudolegal_moves.size();
+
+
+
     generate_knight_moves(pseudolegal_moves);
-    num_moves[1] = pseudolegal_moves.size();
     generate_bishop_moves(pseudolegal_moves);
-    num_moves[2] = pseudolegal_moves.size();
     generate_rook_moves(pseudolegal_moves);
-    num_moves[3] = pseudolegal_moves.size();
     generate_queen_moves(pseudolegal_moves);
-    num_moves[4] = pseudolegal_moves.size();
     generate_king_moves(pseudolegal_moves);
-    num_moves[5] = pseudolegal_moves.size();
+
 
    
     std::vector<Move> legal_moves;
     for (Move &move : pseudolegal_moves){
+
+
         make_move(move);    
-   
-        if (!inCheck((piece_color)move.get_color_turn())){
+
+
+        if (!inCheck((piece_color)(color_turn ^ 1))){
             if (!capture || move.check_capture()){
                 legal_moves.push_back(move);
             }
         }
+
+   
         unmake_move(move);
-        
+
+ 
     }
 
 
@@ -287,7 +287,6 @@ u64 Board::perft(int depth, bool divide){
 
 
 
-
     if (depth == 1){
         return moves.size();
     }
@@ -297,12 +296,13 @@ u64 Board::perft(int depth, bool divide){
         make_move(move); //fix  x  
         u64 new_nodes = perft(depth - 1); 
 
-        if (divide){
-            std::cout << squares_RF_str[move.get_pre_sq()] << " " << squares_RF_str[move.get_post_sq()] << ": " << new_nodes << std::endl;
-        }
+        // if (divide){
+        //     std::cout << "depth: " << depth << " " << squares_RF_str[move.get_pre_sq()] << " " << squares_RF_str[move.get_post_sq()] << ": " << new_nodes << std::endl;
+        // }
 
         nodes += new_nodes;
         unmake_move(move);
+
 
     }
 

@@ -2,6 +2,7 @@
 #include "uci.hpp"
 #include "zobrist.hpp"
 #include "magic.hpp"
+#include "book.hpp"
 #include <SFML/Graphics.hpp>
 
 #include <chrono>
@@ -41,18 +42,28 @@ int loadPosition(Board& board, std::vector<sf::Sprite> &sprite_pieces){
 }
 
 void init_tables(){
-    init_zobrist_keys();
+    // init_zobrist_keys();
     generate_pawn_table();
     generate_knight_table();
     generate_king_table();
     init_magics();
+    read_file();
+
 }
 
 int main() {
 
     init_tables();
-    
+
     uci_loop();
+    //  93d32682782edfae
+
+    // Board board = Board("r1bqkb1r/2pp1ppp/8/pp1PN3/1n6/8/PPPP1PPP/RNBQ1RK1 b kq - 0 9");
+    // std::cout << std::hex << board.zhash_pos << std::endl;
+
+    
+   
+
     return 0;
 }
 
@@ -62,7 +73,7 @@ int main2(int argc, char * argv[]){
 
     
 
-    std::string start_position = "6r1/pp6/1kp2B2/2qp1b2/5N2/1B1P2K1/PP3PP1/4Q3 w - - 2 40";
+    std::string start_position = "rnbqkb1r/pp2pppp/3p1n2/8/3NP3/8/PPP2PPP/RNBQKB1R w KQkq - 1 5";
     // std::string start_position = "r1b1k1nr/pppp1ppp/2nbpq2/4P3/3P4/2P1BN2/PP3PPP/RN1QKB1R b KQkq - 0 6";
     Board board = Board();
 
@@ -158,11 +169,6 @@ int main2(int argc, char * argv[]){
                 move = "";
             }
         }
-
-
-
-
-
         num_pieces_remaining = loadPosition(board, sprite_pieces);
 
         if (isMove){

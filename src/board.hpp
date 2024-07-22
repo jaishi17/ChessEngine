@@ -15,12 +15,12 @@ typedef uint16_t u16;
 struct Move{
 
     Move();
-    Move(int pre_sq, int post_sq, piece_type p_type, piece_type c_type, int castling_rights, bool castle, bool capture, bool promotion, bool color_turn, bool en_passant, int prev_epsq);
+    Move(int pre_sq, int post_sq, piece_type p_type, piece_type c_type, int castling_rights, bool castle, bool capture, bool promotion, bool en_passant, int prev_epsq);
 
-    int get_pre_sq(){
+    inline int get_pre_sq(){
         return move & 0x3f;
     }
-    int get_post_sq(){
+    inline int get_post_sq(){
         return (move >> 6) & 0x3f;
     }
 
@@ -51,12 +51,8 @@ struct Move{
         return (move >> 25) & 1;
     }
 
-    inline bool get_color_turn(){
-        return (move >> 26) & 1;
-    }
-
     inline int get_epsq(){
-        return (move >> 27) & 0x3F;
+        return (move >> 26) & 0x3F;
     }
 
     inline bool operator<(const Move &y) const { 
@@ -65,7 +61,7 @@ struct Move{
 
     
 
-    u64 move;
+    int move;
     // lsb to msb:
     // 6 bits from square
     // 6 bits to square  
@@ -73,7 +69,6 @@ struct Move{
     // 3 bits for capture type
     // 4 bits for a change in castlign rights 
     // 4 bits for flags (castle, capture, promotion, en_passant)
-    // 1 bit for whose turn it is (0 for white)
     // 6 bits for previous en passant square 
 
     // total: 32
@@ -91,7 +86,7 @@ class Board{
         void clearBitboards();
         void clearSCBoards();
 
-        //debugging
+        // debugging
         void print_square(u64 n);
         void print_square(u64 n, int square);
 
@@ -116,8 +111,8 @@ class Board{
         void update_bitboard(piece_color pc, piece_type pt, int pre_sq, int post_sq);
         void move_piece(Move move);
         bool update(std::string move);
-        void make_move(Move move); 
-        void unmake_move(Move move); 
+        void make_move(Move &move); 
+        void unmake_move(Move &move); 
 
         //move generation - movegen.cpp
         void generate_pawn_moves(std::vector<Move> &moves);
@@ -153,6 +148,11 @@ class Board{
         //misc 
         u64 get_zhash();
         
+
+        u64 zhash_pos = 0; //zhash of current position
+
+        // int measuring_times[8];
+
     private:
 
         bool castling_rights[4] = {true, true, true, true}; //WK, WQ, BK, bQ
@@ -172,12 +172,18 @@ class Board{
         bool uci_game = true;
         bool game_done = false;
         bool engine_color = 1;
-        int time[2]; //in milliseconds
-        int time_inc[2];
+        int time[2] = {60000, 60000}; //in milliseconds
+        int time_inc[2] = {2000, 2000};
         std::chrono::time_point<std::chrono::system_clock> end_search_time;
         int movestogo = 0;
-        int time_control_type = 0;  //0 for sudden death, 1 for repeating 
-        std::vector<u64> zhash_moves;
+        int time_control_type = 0;  //0 for sudden death, 1 for repeating, 2 for inc 
+        // std::vector<u64> zhash_moves;
+        u64 zhash_moves[1000];
+        int ply = 0;
+
+        //
+        int nodes = 0;
+        // int mid_eval = 0, end_eval = 0, gamephase = 0; //from white's persepctive
 };
 
 #endif

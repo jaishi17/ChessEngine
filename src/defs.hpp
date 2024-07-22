@@ -5,6 +5,7 @@
 #include <map>
 #include <vector>
 #include <string> 
+#include <iostream>
 
 typedef uint64_t u64;
 
@@ -118,6 +119,26 @@ inline int lsb(u64 n){
    	return lsb_index[((n ^ (n-1)) * debruijn64) >> 58];
 }
 
+
+
+
 const char uci_promo[6] = {'p', 'n', 'b', 'r', 'q', 'k'};
+
+extern const int piece_value_mid[6];
+extern const int piece_value_end[6];
+extern const int perspective[2];
+
+extern int pawn_pst_mid[64], pawn_pst_end[64];
+extern int knight_pst_mid[64], knight_pst_end[64];
+extern int bishop_pst_mid[64], bishop_pst_end[64];
+extern int rook_pst_mid[64], rook_pst_end[64];
+extern int queen_pst_mid[64], queen_pst_end[64];
+extern int king_pst_mid[64], king_pst_end[64];
+
+
+
+extern const int * piece_pst_mid[6];
+extern const int * piece_pst_end[6];
+extern const int piece_phase[6];
 
 #endif
