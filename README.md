@@ -20,6 +20,3 @@ UCI compatible C++ chess engine. https://lichess.org/@/pa-bot
 * Transposition tables
 * Move ordering (MVV-LVA)
 
-
-## Rating 
-TODO
