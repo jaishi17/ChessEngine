@@ -1,4 +1,4 @@
-UCI compatible C++ chess engine. 
+UCI compatible C++ chess engine. https://lichess.org/@/pa-bot
 
 ## Features 
 
