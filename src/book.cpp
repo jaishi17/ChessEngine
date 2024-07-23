@@ -27,15 +27,12 @@ void read_file()
     file.seekg(0, std::ios::beg);
 
     // read the data:
-
-
     unsigned char val;
     for (int i = 0; i < fileSize/16; ++i){
         u64 key = 0;
         short pre_sq = 0, post_sq = 0, weight = 0;
         for (int j = 0; j < 16; ++j){
             file.read(reinterpret_cast<char *>(&val), sizeof(val));
-            // std::cout << std::hex << static_cast<int>(val) << " ";
             if (j <= 7){
                 key += ((u64)val << (8 * (7 - j)));
             }

@@ -74,7 +74,6 @@ struct Move{
     // total: 32
 };
 
-// use 64 bit integers for board represetnation for each piece type
 class Board{
     public:
 
@@ -147,8 +146,6 @@ class Board{
 
         //misc 
         u64 get_zhash();
-        
-
         u64 zhash_pos = 0; //zhash of current position
 
         // int measuring_times[8];
@@ -160,8 +157,6 @@ class Board{
         int move_num = 0; 
         
         int en_passant_sq = 0; //square that the attacking pawn would capture in 
-
-        std::vector<Move> move_list;
 
         // use 64 bit integers for board represetnation for each piece type, white, black, full
         u64 piece_bbs[color_count][piece_count + 1], f_bb;  
@@ -177,7 +172,6 @@ class Board{
         std::chrono::time_point<std::chrono::system_clock> end_search_time;
         int movestogo = 0;
         int time_control_type = 0;  //0 for sudden death, 1 for repeating, 2 for inc 
-        // std::vector<u64> zhash_moves;
         u64 zhash_moves[1000];
         int ply = 0;
 

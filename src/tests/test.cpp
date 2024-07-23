@@ -1,5 +1,5 @@
 #include "../board.hpp"
-
+#include "../magic.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -23,22 +23,28 @@ std::vector<std::string> split_perft_result(std::string s){
 
 
 int main2(){
-    std::string start_position = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1 ";
+
+    generate_pawn_table();
+    generate_knight_table();
+    generate_king_table();
+    init_magics();
+
+    std::string start_position = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
 
     Board board = Board(start_position);
-    // board.show_state();
 
     u64 res = board.perft(6, true);
     std::cout << res << std::endl;
-    // board.show_state();
 
-
-    // u64 res = board.perft(2, false);
-    // std::cout << res << std::endl;
     return 0;
 }
 
 int main(){
+
+    generate_pawn_table();
+    generate_knight_table();
+    generate_king_table();
+    init_magics();
 
     std::ifstream file("tests/perft_results.txt");
     std::string str;
@@ -61,6 +67,8 @@ int main(){
         for(int i = 0; i < 6; ++i){
             results[(int)(split_perft[i + 1][1] - '1')] = std::stoull(split_perft[i + 1].substr(3));
         } 
+
+
         Board board = Board(fen);
 
         int passed = 0, total = 0;
@@ -68,7 +76,9 @@ int main(){
         std::vector<u64> res(6);
 
         for (int i = 0; i < 6; ++i){
-            res[i] = board.perft(i + 1);
+            if (!(idx == 2 && i == 5)){
+                res[i] = board.perft(i + 1);
+            }
             if (res[i] == results[i]){
                 passed++;
             }

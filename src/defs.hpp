@@ -17,7 +17,7 @@ const int piece_count = 6;
 const int square_size = 120;
 const int piece_size = 200;
 
-
+//constants for ranks, files
 const u64 RANK_1 = 0xffull;
 const u64 RANK_2 = 0xff00ull;
 const u64 RANK_3 = 0xff0000ull;
@@ -39,6 +39,7 @@ const u64 G_FILE = 0x4040404040404040ull;
 const u64 H_FILE = 0x8080808080808080ull;
 const std::vector<u64> file_constants = {A_FILE, B_FILE, C_FILE, D_FILE, E_FILE, F_FILE, G_FILE, H_FILE};
 
+//magic hashing indices
 const int rook_shift[64] = {
   52, 53, 53, 53, 53, 53, 53, 52,
   53, 54, 54, 54, 54, 54, 54, 53,
@@ -102,6 +103,8 @@ inline bool get_bit(u64 number, int pos){
     return (number >> pos) & 1;
 }
 
+
+//lsb function 
 const int lsb_index[64] = {
     0, 47,  1, 56, 48, 27,  2, 60,
    57, 49, 41, 37, 28, 16,  3, 61,
@@ -124,6 +127,8 @@ inline int lsb(u64 n){
 
 const char uci_promo[6] = {'p', 'n', 'b', 'r', 'q', 'k'};
 
+
+//eval values
 extern const int piece_value_mid[6];
 extern const int piece_value_end[6];
 extern const int perspective[2];

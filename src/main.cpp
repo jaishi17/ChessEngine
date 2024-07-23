@@ -42,31 +42,22 @@ int loadPosition(Board& board, std::vector<sf::Sprite> &sprite_pieces){
 }
 
 void init_tables(){
-    // init_zobrist_keys();
     generate_pawn_table();
     generate_knight_table();
     generate_king_table();
     init_magics();
     read_file();
-
 }
 
+//run uci
 int main() {
-
     init_tables();
-
     uci_loop();
-    //  93d32682782edfae
-
-    // Board board = Board("r1bqkb1r/2pp1ppp/8/pp1PN3/1n6/8/PPPP1PPP/RNBQ1RK1 b kq - 0 9");
-    // std::cout << std::hex << board.zhash_pos << std::endl;
-
-    
-   
-
     return 0;
 }
 
+
+//gui 
 int main2(int argc, char * argv[]){
 
     init_tables();
@@ -74,10 +65,7 @@ int main2(int argc, char * argv[]){
     
 
     std::string start_position = "rnbqkb1r/pp2pppp/3p1n2/8/3NP3/8/PPP2PPP/RNBQKB1R w KQkq - 1 5";
-    // std::string start_position = "r1b1k1nr/pppp1ppp/2nbpq2/4P3/3P4/2P1BN2/PP3PPP/RN1QKB1R b KQkq - 0 6";
     Board board = Board();
-
-    // std::cout << "current pos eval: " << board.evaluate() << std::endl;
 
     sf::RenderWindow window(sf::VideoMode(960, 960), "chess engine");
     sf::Texture piece_texture, board_texture;
@@ -94,12 +82,8 @@ int main2(int argc, char * argv[]){
         sprite_pieces[i].setScale(0.60f, 0.60f);
     }
 
-    // first is what color i play, second is waht color is at bottom
     bool engine_color = WHITE;
-
     board.set_uci(false);
-
-
     if (argc >= 2){
         if (!std::strcmp(argv[1], "b")){
             engine_color = BLACK;

@@ -108,7 +108,7 @@ void Board::generate_rook_moves(std::vector<Move> &moves){
         rooks = bit_set_to(rooks, pre_sq, 0);
         u64 attacks = rook_moves(f_bb, pre_sq) & ~(piece_bbs[pc][ALL]);
 
-        while(attacks){
+        while(attacks){ 
             int post_sq = lsb(attacks);
             attacks = bit_set_to(attacks, post_sq, 0);
             int change_castle = 0;
@@ -234,43 +234,24 @@ std::vector<Move> Board::generate_moves(bool capture){
     std::vector<Move> pseudolegal_moves;
     pseudolegal_moves.reserve(35); //average
 
-    // std::vector<int> num_moves(6);
-    // int idx = 0, pt = 0;
-    // std::vector<std::string> pts = {"pawn", "knight", "bishop", "rook", "queen", "king"};
-
-
     generate_pawn_moves(pseudolegal_moves); // good
-
-
-
     generate_knight_moves(pseudolegal_moves);
     generate_bishop_moves(pseudolegal_moves);
     generate_rook_moves(pseudolegal_moves);
     generate_queen_moves(pseudolegal_moves);
     generate_king_moves(pseudolegal_moves);
 
-
-   
     std::vector<Move> legal_moves;
+    legal_moves.reserve(35);
     for (Move &move : pseudolegal_moves){
-
-
         make_move(move);    
-
-
         if (!inCheck((piece_color)(color_turn ^ 1))){
             if (!capture || move.check_capture()){
                 legal_moves.push_back(move);
             }
         }
-
-   
         unmake_move(move);
-
- 
     }
-
-
     return legal_moves;
 }
 
@@ -281,18 +262,12 @@ u64 Board::perft(int depth, bool divide){
     moves.reserve(move_reserve_size);
 
     u64 nodes = 0;
-
-
     moves = generate_moves();
-
-
-
     if (depth == 1){
         return moves.size();
     }
 
     for (Move &move : moves){
-
         make_move(move); //fix  x  
         u64 new_nodes = perft(depth - 1); 
 
@@ -302,11 +277,6 @@ u64 Board::perft(int depth, bool divide){
 
         nodes += new_nodes;
         unmake_move(move);
-
-
     }
-
-   
-
     return nodes; 
 }

@@ -69,8 +69,6 @@ void Board::setToFen(std::string fen){
 
     int rank = 8, fen_idx = 0;
     char file = 'a';
-    // int len = fen.size();
-
     std::map<char, std::pair<piece_color, piece_type>> fen_map = {{'p', {BLACK, PAWN}}, {'n', {BLACK, KNIGHT}}, {'b', {BLACK, BISHOP}}, 
                                                               {'r', {BLACK, ROOK}}, {'q', {BLACK, QUEEN}},{'k', {BLACK, KING}}, 
                                                               {'P', {WHITE, PAWN}}, {'N', {WHITE, KNIGHT}}, {'B', {WHITE, BISHOP}}, 
@@ -318,9 +316,6 @@ bool Board::is_square_attacked(piece_color pc, int square){
 
     u64 attacks = (pawns | knights | kings | rooks | bishops | queens);
 
-    // std::cout << (squares_RF)(square) << std::endl;
-    // print_square(attacks);
-
     return attacks != (u64)0;
 }
 
@@ -348,40 +343,19 @@ void Board::make_move(Move &move){
     piece_color pc = sc_board[pre_sq].first;
     piece_type pt = sc_board[pre_sq].second; 
 
-
     bool castle = move.check_castle(), capture = move.check_capture(), promotion = move.check_promoted(), en_passant = move.check_en_passant();
     piece_type p_type = (piece_type)move.get_promoted(), c_type = (piece_type)move.get_captured();
     int new_castling_rights = move.get_castling();
-
-
-    //----------------------
     
+    //----------------------
     update_bitboard(pc, pt, pre_sq, post_sq);
     zhash_pos ^= zobrist_keys[64 * (((int)pc ^ 1) + 2 * pt) + pre_sq];
 
-    // mid_eval += eval_color[pc] * piece_pst_mid[pt][pre_sq ^ eval_flip[pc]];
-    // end_eval += eval_color[pc] * piece_pst_end[pt][pre_sq ^ eval_flip[pc]];
-
-    // if (pc == WHITE){
-    //     mid_eval -= (piece_pst_mid[pt][pre_sq ^ 56]);
-    //     end_eval -= (piece_pst_end[pt][pre_sq ^ 56]);
-    // }
-    // else {
-    //     mid_eval += (piece_pst_mid[pt][pre_sq]);
-    //     end_eval += (piece_pst_end[pt][pre_sq]);
-    // }
-
     //----------------------
-    
     if (en_passant_sq != 0){
         zhash_pos ^= zobrist_keys[772 + en_passant_sq % 8];
-
     }
-
-
-    //capturing a piece
     if (capture){
-
         u64 cap_sq = post_sq;
         if (en_passant){
             if (pc == WHITE){
@@ -393,26 +367,10 @@ void Board::make_move(Move &move){
             f_bb = bit_set_to(f_bb, cap_sq, 0);
             sc_board[cap_sq].first = NONE;
         }        
-
         piece_bbs[pc ^ 1][ALL] = bit_set_to(piece_bbs[pc ^ 1][ALL], cap_sq, 0);
         piece_bbs[pc ^ 1][c_type] = bit_set_to(piece_bbs[pc ^ 1][c_type], cap_sq, 0);
         zhash_pos ^= zobrist_keys[64 * (((int)pc) + 2 * c_type) + cap_sq];
-
-        // mid_eval += eval_color[pc ^ 1] * (piece_pst_mid[c_type][cap_sq ^ eval_flip[pc ^ 1]] + piece_value_mid[c_type]);
-        // end_eval += eval_color[pc ^ 1] * (piece_pst_end[c_type][cap_sq ^ eval_flip[pc ^ 1]] + piece_value_end[c_type]);
-            
-        // if ((pc ^ 1) == WHITE){
-        //     mid_eval -= (piece_value_mid[c_type] + piece_pst_mid[c_type][cap_sq ^ 56]);
-        //     end_eval -= (piece_value_end[c_type] + piece_pst_end[c_type][cap_sq ^ 56]);
-        // }
-        // else {
-        //     mid_eval += (piece_value_mid[c_type] + piece_pst_mid[c_type][cap_sq]);
-        //     end_eval += (piece_value_end[c_type] + piece_pst_end[c_type][cap_sq]);
-        // }
-        // gamephase -= piece_phase[c_type];
-
     }
-    //castle
     if (castle){
         int rook_prev = 0, rook_post = 0;
         if (pc == WHITE && pre_sq + 2 == post_sq){
@@ -432,43 +390,13 @@ void Board::make_move(Move &move){
         sc_board[rook_post] = {pc, ROOK};
         zhash_pos ^= zobrist_keys[64 * (((int)pc ^ 1) + 2 * ROOK) + rook_prev];
         zhash_pos ^= zobrist_keys[64 * (((int)pc ^ 1) + 2 * ROOK) + rook_post];
-
-
-        // mid_eval += eval_color[pc] * (piece_pst_mid[ROOK][rook_prev ^ eval_flip[pc]] - piece_pst_mid[ROOK][rook_post ^ eval_flip[pc]]);
-        // end_eval += eval_color[pc] * (piece_pst_end[ROOK][rook_prev ^ eval_flip[pc]] - piece_pst_end[ROOK][rook_post ^ eval_flip[pc]]);
-
-        // if (pc == WHITE){
-        //     mid_eval += (piece_pst_mid[ROOK][rook_post ^ 56] - piece_pst_mid[ROOK][rook_prev ^ 56]);
-        //     end_eval += (piece_pst_end[ROOK][rook_post ^ 56] - piece_pst_end[ROOK][rook_prev ^ 56]);
-        // }
-        // else{
-        //     mid_eval -= (piece_pst_mid[ROOK][rook_post] - piece_pst_mid[ROOK][rook_prev]);
-        //     end_eval -= (piece_pst_end[ROOK][rook_post] - piece_pst_end[ROOK][rook_prev]);
-        // }
-
-
     }
     if (promotion){
         piece_bbs[pc][PAWN] = bit_set_to(piece_bbs[pc][PAWN], post_sq, 0);
         piece_bbs[pc][p_type] = bit_set_to(piece_bbs[pc][p_type], post_sq, 1);
-
-
-        
-        // mid_eval += eval_color[pc] * (piece_value_mid[PAWN] - piece_value_mid[p_type]);
-        // end_eval += eval_color[pc] * (piece_value_end[PAWN] - piece_value_end[p_type]);
-        // if (pc == WHITE){
-        //     mid_eval += (piece_value_mid[p_type] - piece_value_mid[PAWN]);
-        //     end_eval += (piece_value_end[p_type] - piece_value_end[PAWN]);
-        // }
-        // else {
-        //     mid_eval -= (piece_value_mid[p_type] - piece_value_mid[PAWN]);
-        //     end_eval -= (piece_value_end[p_type] - piece_value_end[PAWN]);
-        // }
-
         pt = p_type;
     }
-
-    //castling rights
+    //--------------
     for (int i = 0; i < 4; ++i){
         if (new_castling_rights & (1 << i)){
             castling_rights[i] = false;
@@ -477,9 +405,6 @@ void Board::make_move(Move &move){
         }
     }
     en_passant_sq = 0;
-    // en_passant 
-
-
     if (post_sq == pre_sq + 16 && pt == PAWN && pc == WHITE){
         if ((post_sq % 8 != 0 && get_bit(piece_bbs[BLACK][PAWN], post_sq - 1)) || (post_sq % 8 != 7 && (get_bit(piece_bbs[BLACK][PAWN], post_sq + 1)))){
             en_passant_sq = pre_sq + 8; 
@@ -487,38 +412,19 @@ void Board::make_move(Move &move){
         }
     } 
     else if (post_sq == pre_sq - 16 && pt == PAWN && pc == BLACK){
-
         if (((post_sq % 8) != 0 && get_bit(piece_bbs[WHITE][PAWN], post_sq -1)) || ((post_sq % 8 != 7) && (get_bit(piece_bbs[WHITE][PAWN], post_sq + 1)))){
             en_passant_sq = pre_sq - 8;
             zhash_pos ^= zobrist_keys[772 + (en_passant_sq % 8)];
         }
     }
 
-    //-----------------------------
-
-    // mid_eval += eval_color[pc ^ 1] * piece_pst_mid[pt][post_sq ^ eval_flip[pc]];
-    // end_eval += eval_color[pc^ 1] * piece_pst_end[pt][post_sq ^ eval_flip[pc]];
-    // // if (pc == WHITE){
-    //     mid_eval += (piece_pst_mid[pt][post_sq ^ 56]);
-    //     end_eval += (piece_pst_end[pt][post_sq ^ 56]);
-    // }
-    // else {
-    //     mid_eval -= (piece_pst_mid[pt][post_sq]);
-    //     end_eval -= (piece_pst_end[pt][post_sq]);
-    // }
-
-
+    //-------------
     zhash_pos ^= zobrist_keys[64 * (((int)pc ^ 1) + 2 * pt) + post_sq];
     zhash_pos ^= zobrist_keys[780];
-
-    // zhash_pos ^= zobrist_keys[pc][pt][post_sq];
     sc_board[pre_sq].first = NONE;
     sc_board[post_sq] = {pc, pt};
     color_turn = !color_turn;
     ply++;   
-
-    move_list.push_back(move);
-
     zhash_moves[ply] = zhash_pos;
 
 }
@@ -527,8 +433,6 @@ bool Board::update(std::string move){
     int pre_sq = 8 * ((int)(move[1] - '1')) + (move[0] - 'a'), post_sq = 8 * ((int)(move[3] - '1')) + (move[2] - 'a');
 
     std::vector<Move> possible_moves = generate_moves();
-
-
     if (possible_moves.size() == 0){
         game_done = true;
         if (inCheck((piece_color)color_turn)){
@@ -539,16 +443,12 @@ bool Board::update(std::string move){
         }
     }
 
-
     for (Move &move : possible_moves){
         if (move.get_pre_sq() == pre_sq && move.get_post_sq() == post_sq){
-
             make_move(move);
-
             if (!uci_game){
                 engine_move(-1, -1);
             }
-            
             return true;
         }
     }
@@ -564,35 +464,16 @@ void Board::unmake_move(Move &move){
     piece_color pc = sc_board[post_sq].first;
     piece_type pt = sc_board[post_sq].second; 
 
-
-
     bool castle = move.check_castle(), capture = move.check_capture(), promotion = move.check_promoted(), en_passant = move.check_en_passant();
     piece_type p_type = (piece_type)move.get_promoted(), c_type = (piece_type)move.get_captured();
     int new_castling_rights = move.get_castling();
 
     //---------------------
-
     update_bitboard(pc, pt, post_sq, pre_sq);
     sc_board[post_sq].first = NONE;
-
     zhash_pos ^= zobrist_keys[64 * (((int)pc ^ 1) + 2 * pt) + post_sq];
 
-
-    // mid_eval += eval_color[pc] * piece_pst_mid[pt][post_sq ^ eval_flip[pc]];
-    // end_eval += eval_color[pc] * piece_pst_end[pt][post_sq ^ eval_flip[pc]];
-    // // // if (pc == WHITE){
-    //     mid_eval -= (piece_pst_mid[pt][post_sq ^ 56]);
-    //     end_eval -= (piece_pst_end[pt][post_sq ^ 56]);
-    // }
-    // else {
-    //     mid_eval += (piece_pst_mid[pt][post_sq]);
-    //     end_eval += (piece_pst_end[pt][post_sq]);
-    // }
-
     //---------------
-
-    
-    //captured a piece
     if (capture){
         u64 cap_sq = post_sq;
         if (en_passant){
@@ -603,32 +484,12 @@ void Board::unmake_move(Move &move){
                 cap_sq = post_sq + 8;
             }
         }
-
         piece_bbs[pc ^ 1][ALL] = bit_set_to(piece_bbs[pc ^ 1][ALL], cap_sq, 1);
         piece_bbs[pc ^ 1][c_type] = bit_set_to(piece_bbs[pc ^ 1][c_type], cap_sq, 1);
         sc_board[cap_sq] = {(piece_color)(pc ^ 1), c_type};
-        // zhash_pos ^= zobrist_keys[pc ^ 1][c_type][cap_sq];
         zhash_pos ^= zobrist_keys[64 * (((int)pc) + 2 * c_type) + cap_sq];
-
         f_bb = bit_set_to(f_bb, cap_sq, 1);
-
-        
-        // mid_eval += eval_color[pc] * (piece_pst_mid[c_type][cap_sq ^ eval_flip[pc ^ 1]] + piece_value_mid[c_type]);
-        // end_eval += eval_color[pc] * (piece_pst_end[c_type][cap_sq ^ eval_flip[pc ^ 1]] + piece_value_end[c_type]);
-            
-        // if ((pc^1) == WHITE){
-        //     mid_eval += (piece_value_mid[c_type] + piece_pst_mid[c_type][cap_sq ^ 56]);
-        //     end_eval += (piece_value_end[c_type] + piece_pst_end[c_type][cap_sq ^ 56]);
-        // }
-        // else  {
-        //     mid_eval -= (piece_value_mid[c_type] + piece_pst_mid[c_type][cap_sq]);
-        //     end_eval -= (piece_value_end[c_type] + piece_pst_end[c_type][cap_sq]);
-        // }
-        // gamephase += piece_phase[c_type];
     }
-
-
-    //castle
     if (castle){
         int rook_prev = 0, rook_post = 0;
         if (pc == WHITE && pre_sq + 2 == post_sq){
@@ -646,56 +507,25 @@ void Board::unmake_move(Move &move){
         update_bitboard(pc, ROOK, rook_post, rook_prev);
         sc_board[rook_prev] = {pc, ROOK};
         sc_board[rook_post] = {NONE, ROOK};
-    
-
         zhash_pos ^= zobrist_keys[64 * (((int)pc ^ 1) + 2 * ROOK) + rook_prev];
         zhash_pos ^= zobrist_keys[64 * (((int)pc ^ 1) + 2 * ROOK) + rook_post];
         castle = true;
-
-        // mid_eval -= eval_color[pc] * (piece_pst_mid[ROOK][rook_prev ^ eval_flip[pc]] - piece_pst_mid[ROOK][rook_post ^ eval_flip[pc]]);
-        // end_eval -= eval_color[pc] * (piece_pst_end[ROOK][rook_prev ^ eval_flip[pc]] - piece_pst_end[ROOK][rook_post ^ eval_flip[pc]]);
-        // if (pc == WHITE){
-        //     mid_eval -= (piece_pst_mid[ROOK][rook_post ^ 56] - piece_pst_mid[ROOK][rook_prev ^ 56]);
-        //     end_eval -= (piece_pst_end[ROOK][rook_post ^ 56] - piece_pst_end[ROOK][rook_prev ^ 56]);
-        // }
-        // else  {
-        //     mid_eval += (piece_pst_mid[ROOK][rook_post] - piece_pst_mid[ROOK][rook_prev]);
-        //     end_eval += (piece_pst_end[ROOK][rook_post] - piece_pst_end[ROOK][rook_prev]);
-        // }
-
-
     }
-    //castling rights 
+    //---------------
     for (int i = 0; i < 4; ++i){
         if ((1 << i) & new_castling_rights){
             castling_rights[i] = true;
             zhash_pos ^= zobrist_keys[768 + i];
-
         }
     }
     //promotion
     if (promotion){
         piece_bbs[pc][PAWN] = bit_set_to(piece_bbs[pc][PAWN], pre_sq, 1);
         piece_bbs[pc][p_type] = bit_set_to(piece_bbs[pc][p_type], pre_sq, 0);
-
-        // if (pc == WHITE){
-        //     mid_eval -= (piece_value_mid[p_type] - piece_value_mid[PAWN]);
-        //     end_eval -= (piece_value_end[p_type] - piece_value_end[PAWN]);
-        // }
-        // else {
-        //     mid_eval += (piece_value_mid[p_type] - piece_value_mid[PAWN]);
-        //     end_eval += (piece_value_end[p_type] - piece_value_end[PAWN]);
-        // }
-        // mid_eval -= eval_color[pc] * (piece_value_mid[PAWN] - piece_value_mid[p_type]);
-        // end_eval -= eval_color[pc] * (piece_value_end[PAWN] - piece_value_end[p_type]);
-
         pt = PAWN;
     }
 
     //-----------------
-
-
-    // zhash_pos ^= zobrist_keys[pc][pt][pre_sq];
     zhash_pos ^= zobrist_keys[64 * (((int)pc ^ 1) + 2 * pt) + pre_sq];
     zhash_pos ^= zobrist_keys[780];
 
@@ -706,33 +536,16 @@ void Board::unmake_move(Move &move){
     if (en_passant_sq != 0){
         zhash_pos ^= zobrist_keys[772 + en_passant_sq % 8];
     }
-  
     en_passant_sq = move.get_epsq();
-
     if (en_passant_sq != 0){
-        // std::cout << "her2e: " << std::endl;
         zhash_pos ^= zobrist_keys[772 + en_passant_sq % 8];
     }
-    move_list.pop_back();
-
-    // mid_eval -= eval_color[pc] * piece_pst_mid[pt][pre_sq ^ eval_flip[pc]];
-    // end_eval -= eval_color[pc] * piece_pst_end[pt][pre_sq ^ eval_flip[pc]];
-    // if (pc == WHITE){
-    //     mid_eval += (piece_pst_mid[pt][pre_sq ^ 56]);
-    //     end_eval += (piece_pst_end[pt][pre_sq ^ 56]);
-    // }
-    // else {
-    //     mid_eval -= (piece_pst_mid[pt][pre_sq]);
-    //     end_eval -= (piece_pst_end[pt][pre_sq]);
-    // }
-
-
     ply--;
 
 }
 
 
-//engien stuff
+//engine stuff
 void Board::set_time(int t, int color){
     time[color] = t;
 }

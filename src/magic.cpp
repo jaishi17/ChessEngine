@@ -1,5 +1,6 @@
 #include "board.hpp"
 #include "defs.hpp"
+#include "magic.hpp"
 
 #include <functional>
 #include <iostream>
@@ -14,7 +15,6 @@ std::vector<u64> rook_table[64], bishop_table[64];
 
 
 void generate_pawn_table(){
-
     for (int i = 0; i < 64; ++i){
         pawn_push[0][i] = 0;
         pawn_attack[0][i] = 0;
@@ -79,29 +79,7 @@ void generate_king_table(){
     }
 }
 
-int rook_hash(u64 blockers, int square){
-    return (blockers * rook_magic[square]) >> (rook_shift[square]);
-}
 
-int bishop_hash(u64 blockers, int square){
-    return (blockers * bishop_magic[square]) >> bishop_shift[square];
-}
-
-u64 rook_moves(u64 blockers, int square){
-    blockers &= rook_mask[square];
-    int key = rook_hash(blockers, square);
-    return rook_table[square][key];
-}
-
-u64 bishop_moves(u64 blockers, int square){
-    blockers &= bishop_mask[square];
-    int key = bishop_hash(blockers, square);
-    return bishop_table[square][key];
-}
-
-u64 queen_moves(u64 blockers, int square){
-    return bishop_moves(blockers, square) | rook_moves(blockers, square);
-}
 
 
 void generate_rook_mask(){
@@ -120,7 +98,6 @@ void generate_rook_mask(){
 }
 
 void generate_bishop_mask(){
-
     std::vector<std::pair<int, int>> dir = {{-1, -1}, {1, -1}, {-1, 1}, {1, 1}};
 
     //bishop masks
@@ -300,19 +277,4 @@ void init_magics(){
 
     generate_bishop_mask();
     generate_bishop_magic();
-    // std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
-
-    // generate_rook_mask();
-    // std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
-    // generate_rook_magic();
-    // std::chrono::steady_clock::time_point t3 = std::chrono::steady_clock::now();
-    // generate_bishop_mask();
-    // std::chrono::steady_clock::time_point t4 = std::chrono::steady_clock::now();
-    // generate_bishop_magic();
-    // std::chrono::steady_clock::time_point t5 = std::chrono::steady_clock::now();
-    // std::cout << "rook mask = " << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count() << "[ms]" << std::endl;
-    // std::cout << "rook magic = " << std::chrono::duration_cast<std::chrono::milliseconds>(t3 - t2).count() << "[ms]" << std::endl;
-    // std::cout << "bishop mask  = " << std::chrono::duration_cast<std::chrono::milliseconds>(t4 - t3).count() << "[ms]" << std::endl;
-    // std::cout << "bishop magic = " << std::chrono::duration_cast<std::chrono::milliseconds>(t5 - t4).count() << "[ms]" << std::endl;
-
 }

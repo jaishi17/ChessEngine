@@ -153,28 +153,10 @@ int king_pst_end[64] = {
 const int * piece_pst_mid[6] = {pawn_pst_mid, knight_pst_mid, bishop_pst_mid, rook_pst_mid, queen_pst_mid, king_pst_mid};
 const int * piece_pst_end[6] = {pawn_pst_end, knight_pst_end, bishop_pst_end, rook_pst_end, queen_pst_end, king_pst_end};
 const int piece_phase[6] = {0, 1, 1, 2, 4, 0};
-/*
-TODO:
-hook up to uci 
-
-search:
-    move order (capture, promotion, etc)
-    quiesnce search
-    transposition tables
-create a engine/game class 
-
-*/
 
 int Board::evaluate(){
-
-    
-    // int ret_mid = mid_eval;
-    // int ret_end = end_eval;
-    // int phase = gamephase;
-
     int ret_mid = 0, ret_end = 0;
     int phase = 0; 
-
 
     u64 white_bb = piece_bbs[WHITE][ALL];
     while (white_bb > 0){
@@ -208,11 +190,6 @@ int Board::evaluate(){
         ret_end -= (14 - dist) ;
     }
 
-    // end_eval += (14 - dist) * 10;
-
-    // std::cout << mid_eval << " " << end_eval << " " << gamephase << std::endl;
-
-
     return (ret_mid * phase + ret_end * (24 - phase))/24;
 }
 
@@ -244,14 +221,10 @@ void Board::sort_moves(std::vector<Move> &moves){
         }
         // previosuly stored move
         if (has_move && prev_move.move == move.move){
-            move_score += 1000000;
+            move_score += 10000;
         }
-
         // std::cout << squares_RF_str[move.get_pre_sq()] << squares_RF_str[move.get_post_sq()] << " eval: " << move_score << std::endl;
-
         move_scores[idx++] = std::make_pair(move_score, move);
-
-
     }
     std::sort(move_scores.begin(), move_scores.end(), std::greater<>());
 
@@ -324,6 +297,7 @@ int Board::search(int depth, int alpha, int beta, bool compute_move){
     }
 
 
+    //check transposition table
     int original_alpha = alpha;
     u64 ztable_index = zhash_pos >> (64 - zobrist_size);
     TTentry tt_entry = ztable[ztable_index];
@@ -349,7 +323,7 @@ int Board::search(int depth, int alpha, int beta, bool compute_move){
 
 
     std::vector<Move> moves = generate_moves();
-    sort_moves(moves); // to test
+    sort_moves(moves); // move ordering 
     
 
     //checkmate / draw
@@ -365,32 +339,34 @@ int Board::search(int depth, int alpha, int beta, bool compute_move){
         }
     }
 
+
     int best_eval = n_inf - 1;
-    
     Move temp_best_move = Move();
 
-
+    bool first_move = true;
     for (Move &move : moves){
         make_move(move);
-        int eval = -1 * search(depth - 1, -beta, -alpha,  false);
+        int eval;
+        if (first_move){
+            eval = -1 * search(depth - 1, -beta, -alpha,  false);
+            first_move = false;
+        }
+        else{
+            eval = -1 * search(depth - 1, -alpha - 1, -alpha, false);
+            if (eval > alpha && beta - alpha > 1){
+                eval = -1 * search(depth - 1, -beta, -alpha, false);
+            }
+        }
         unmake_move(move);
-
-        // if (compute_move && depth == 6){
-        //     std::cout << squares_RF_str[move.get_pre_sq()] << squares_RF_str[move.get_post_sq()] << ": " << eval << "\n";
-        // }   
-
         if (eval > best_eval){
-            temp_best_move = move;
-            
+            temp_best_move = move;    
             best_eval = eval;
         }
 
         alpha = std::max(alpha, eval);
-
         if (alpha >= beta){
             break;
         }
-
         if (std::chrono::system_clock::now() > end_search_time){
             return 0;
         } 
@@ -401,20 +377,22 @@ int Board::search(int depth, int alpha, int beta, bool compute_move){
         return 0;
     } 
     else{
-        ztable[ztable_index].eval = best_eval;
-        if (best_eval <= original_alpha){
-            ztable[ztable_index].eval_type = 2;
+        //depth replacement scheme
+        if (tt_entry.depth <= depth){
+            ztable[ztable_index].eval = best_eval;
+            if (best_eval <= original_alpha){
+                ztable[ztable_index].eval_type = 2;
+            }
+            else if (best_eval >= beta){
+                ztable[ztable_index].eval_type = 1;
+            }
+            else{
+                ztable[ztable_index].eval_type = 0;
+            }
+            ztable[ztable_index].depth = depth;
+            ztable[ztable_index].best_move = temp_best_move;
+            ztable[ztable_index].z_key = zhash_pos;
         }
-        else if (best_eval >= beta){
-            ztable[ztable_index].eval_type = 1;
-        }
-        else{
-            ztable[ztable_index].eval_type = 0;
-        }
-        ztable[ztable_index].depth = depth;
-        ztable[ztable_index].best_move = temp_best_move;
-        ztable[ztable_index].z_key = zhash_pos;
-
         if (compute_move){
             best_move = temp_best_move;
             // std::cout << squares_RF_str[best_move.get_pre_sq()] << squares_RF_str[best_move.get_post_sq()] << "\n";
@@ -431,7 +409,7 @@ int Board::compute_time(){
         return time[color_turn] / (movestogo+2);
     }
     else{
-        return time[color_turn] / 20 + time_inc[color_turn];
+        return (time[color_turn] + time_inc[color_turn]) / 20;
     }
 }
 
@@ -441,7 +419,7 @@ void Board::engine_move(int uci_depth, int uci_time){
     
     // set_engine_color(color_turn);
     int pos_eval = 0;
-    //opening boo k move
+    //opening book move
     if (book_moves.find(zhash_pos) != book_moves.end()){
         std::vector<Move> possible_moves = generate_moves();
 
@@ -480,19 +458,8 @@ void Board::engine_move(int uci_depth, int uci_time){
             std::cout << "info (used) depth: " << depth - 1 << " nodes: " << nodes << " nps: " << nodes/uci_time << "\n";
         }
     }
-    
-
-   
-
-    // if (get_game_done()){
-    //     print_result();
-    //     return;
-    // }
-
 
     make_move(best_move);
-
-
 
     if (best_move.check_promoted()){
         std::cout << "bestmove " << squares_RF_str[best_move.get_pre_sq()] << squares_RF_str[best_move.get_post_sq()] << uci_promo[best_move.get_promoted()] << "\n";
@@ -501,14 +468,6 @@ void Board::engine_move(int uci_depth, int uci_time){
         std::cout << "bestmove " << squares_RF_str[best_move.get_pre_sq()] << squares_RF_str[best_move.get_post_sq()] << "\n";
     }
     std::cout << "info eval: " << pos_eval << "\n";
-    // std::cout << "info mid_eval: " << mid_eval << " " << " end_eval " << end_eval << " gamephase " << gamephase  << std::endl;
-    // std::cout << "info eval time: " << measure_time << std::endl;
-
-    // print_square(piece_bbs[WHITE][PAWN]);
-    // show_state();
-    // std::cout << std::hex << zhash_pos << "\n";
-
-
     std::chrono::steady_clock::time_point end_time = std::chrono::steady_clock::now();
     time[engine_color] -= std::chrono::duration_cast<std::chrono::milliseconds>(end_time - begin_time).count();
     // std::cout << "info time left for engine: " << time[engine_color] << "[ms]" << std::endl;
