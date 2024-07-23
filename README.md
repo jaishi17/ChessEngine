@@ -1,4 +1,4 @@
-UCI compatible C++ chess engine. 
+UCI compatible C++ chess engine. https://lichess.org/@/pa-bot
 
 ## Features 
 
@@ -7,6 +7,7 @@ UCI compatible C++ chess engine.
 * Bitboards
 * Magic bitboards for sliding pieces
 * Pseudo-legal Move Generation
+* Zobrist hashing
 
 #### Evaluation 
 * Material score
@@ -15,7 +16,7 @@ UCI compatible C++ chess engine.
 
 #### Search
 * Negamax with Alpha-beta pruning
-* Iterative deepening 
+* Iterative deepening
+* Transposition tables
+* Move ordering (MVV-LVA)
 
-## Rating 
-TODO
