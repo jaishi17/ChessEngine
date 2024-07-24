@@ -17,6 +17,7 @@ UCI compatible C++ chess engine. https://lichess.org/@/pa-bot
 #### Search
 * Negamax with Alpha-beta pruning
 * Iterative deepening
-* Transposition tables
-* Move ordering (MVV-LVA)
+* Transposition tables (depth replacement scheme)
+* Move ordering (MVV-LVA) 
+* Principal variation search
 
